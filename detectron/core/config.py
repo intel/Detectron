@@ -1004,6 +1004,7 @@ _DEPRECATED_KEYS = set(
         'TRAIN.DROPOUT',
         'USE_GPU_NMS',
         'TEST.NUM_TEST_IMAGES',
+        '--device_id'
     }
 )
 
