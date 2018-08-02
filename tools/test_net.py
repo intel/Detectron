@@ -110,11 +110,11 @@ if __name__ == '__main__':
     assert_and_infer_cfg()
     logger.info('Testing with config:')
     logger.info(pprint.pformat(cfg))
-    
+
     while not os.path.exists(cfg.TEST.WEIGHTS) and args.wait:
         logger.info('Waiting for \'{}\' to exist...'.format(cfg.TEST.WEIGHTS))
         time.sleep(10)
-    print(args.device_id)
+
     run_inference(
         cfg.TEST.WEIGHTS,
         ind_range=args.range,
