@@ -29,6 +29,7 @@ import os
 import yaml
 
 from caffe2.python import workspace
+from caffe2.python import transformations as tf
 
 from detectron.core.config import cfg
 from detectron.core.config import get_output_dir
@@ -233,7 +234,7 @@ def test_net(
     roidb, dataset, start_ind, end_ind, total_num_images = get_roidb_and_dataset(
         dataset_name, proposal_file, ind_range
     )
-    model = initialize_model_from_cfg(weights_file, gpu_id=gpu_id)
+    model, ob, ob_mask = initialize_model_from_cfg(weights_file, gpu_id=gpu_id)
     num_images = len(roidb)
     num_classes = cfg.MODEL.NUM_CLASSES
     all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
@@ -254,11 +255,19 @@ def test_net(
             box_proposals = None
 
         im = cv2.imread(entry['image'])
-        print("im is {}".format(entry['image']))
+        print("im is {} and i is {} ".format(entry['image'], i))
         with c2_utils.NamedCudaScope(gpu_id):
             cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(
                 model, im, box_proposals, timers
             )
+        
+        if os.environ.get('DPROFILE')=="1" and ob != None:
+            logging.warning("enter profile log")
+            logging.warning("net observer time = {}".format(ob.average_time()))
+            logging.warning("net observer time = {}".format(ob.average_time_children()))
+        if os.environ.get('DPROFILE')=="1" and ob_mask != None:
+            logging.warning("mask net observer time = {}".format(ob.average_time()))
+            logging.warning("mask net observer time = {}".format(ob.average_time_children()))
 
         extend_results(i, all_boxes, cls_boxes_i)
         if cls_segms_i is not None:
@@ -304,7 +313,13 @@ def test_net(
                 dataset=dataset,
                 show_class=True
             )
+    #remove observer
+    if ob != None: 
+        modle.net.RemoveObserver(ob)
+    if ob_mask != None:
+        model.mask_net.RemoveObserver(ob)
 
+    
     cfg_yaml = yaml.dump(cfg)
     if ind_range is not None:
         det_name = 'detection_range_%s_%s.pkl' % tuple(ind_range)
@@ -331,14 +346,28 @@ def initialize_model_from_cfg(weights_file, gpu_id=0):
     net_utils.initialize_gpu_from_weights_file(
         model, weights_file, gpu_id=gpu_id,
     )
+    ob=None
+    ob_mask=None
     model_builder.add_inference_inputs(model)
+    if gpu_id == -2 and os.environ.get('DOPT')=="1":
+        logging.warning('optimize....................')
+        tf.optimizeForIDEEP(model.net)
     workspace.CreateNet(model.net)
+    if os.environ.get('DPROFILE')=="1":
+        logging.warning('need profile, add observer....................')
+        ob = model.net.AddObserver("TimeObserver")
     workspace.CreateNet(model.conv_body_net)
     if cfg.MODEL.MASK_ON:
+        if gpu_id == -2 and os.environ.get('DOPT')=="1":
+            logging.warning('optimize....................')
+            tf.optimizeForIDEEP(model.mask_net) 
         workspace.CreateNet(model.mask_net)
+        if os.environ.get('DPROFILE')=="1":
+            ob_mask = model.mask_net.AddObserver("TimeObserver")
+
     if cfg.MODEL.KEYPOINTS_ON:
         workspace.CreateNet(model.keypoint_net)
-    return model
+    return model, ob, ob_mask
 
 
 def get_roidb_and_dataset(dataset_name, proposal_file, ind_range):
