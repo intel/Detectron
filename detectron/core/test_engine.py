@@ -349,7 +349,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0):
     ob=None
     ob_mask=None
     model_builder.add_inference_inputs(model)
-    if gpu_id == -2 and os.environ.get('DOPT')=="1":
+    if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
         logging.warning('optimize....................')
         tf.optimizeForIDEEP(model.net)
     workspace.CreateNet(model.net)
@@ -358,7 +358,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0):
         ob = model.net.AddObserver("TimeObserver")
     workspace.CreateNet(model.conv_body_net)
     if cfg.MODEL.MASK_ON:
-        if gpu_id == -2 and os.environ.get('DOPT')=="1":
+        if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
             logging.warning('optimize....................')
             tf.optimizeForIDEEP(model.mask_net) 
         workspace.CreateNet(model.mask_net)
