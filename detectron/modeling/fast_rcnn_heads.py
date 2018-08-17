@@ -57,7 +57,8 @@ def add_fast_rcnn_outputs(model, blob_in, dim):
     if not model.train:  # == if test
         # Only add softmax when testing; during training the softmax is combined
         # with the label cross entropy loss for numerical stability
-        model.Softmax('cls_score', 'cls_prob', engine='CUDNN')
+        # model.Softmax('cls_score', 'cls_prob', engine='CUDNN')
+        model.Softmax('cls_score', 'cls_prob')      #Fix the hard coding CUDNN Engine
     # Box regression layer
     num_bbox_reg_classes = (
         2 if cfg.MODEL.CLS_AGNOSTIC_BBOX_REG else model.num_classes

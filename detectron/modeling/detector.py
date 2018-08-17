@@ -62,6 +62,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         self.do_not_update_params = []  # Param on this list are not updated
         self.net.Proto().type = cfg.MODEL.EXECUTION_TYPE
         self.net.Proto().num_workers = cfg.NUM_GPUS * 4
+        self.use_cudnn = False  #Fix the Engine CUDNN warning
         self.prev_use_cudnn = self.use_cudnn
         self.gn_params = []  # Param on this list are GroupNorm parameters
 
