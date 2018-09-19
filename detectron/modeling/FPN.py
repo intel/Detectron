@@ -138,7 +138,6 @@ def add_fpn(model, fpn_level_info):
     ]
     fpn_dim_lateral = fpn_level_info.dims
     xavier_fill = ('XavierFill', {})
-
     # For the coarsest backbone level: 1x1 conv only seeds recursion
     if cfg.FPN.USE_GN:
         # use GroupNorm
@@ -186,6 +185,9 @@ def add_fpn(model, fpn_level_info):
     # Post-hoc scale-specific 3x3 convs
     blobs_fpn = []
     spatial_scales = []
+
+    conv3x3_algorithm = [1, 1, 1, 1] # 1 for winograd_conv, 0 for direct_conv
+    #conv3x3_algorithm = [0, 1, 1, 1]
     for i in range(num_backbone_stages):
         if cfg.FPN.USE_GN:
             # use GroupNorm
@@ -199,7 +201,8 @@ def add_fpn(model, fpn_level_info):
                 pad=1,
                 stride=1,
                 weight_init=xavier_fill,
-                bias_init=const_fill(0.0)
+                bias_init=const_fill(0.0),
+                conv_algorithm = conv3x3_algorithm[i]
             )
         else:
             fpn_blob = model.Conv(
@@ -211,7 +214,8 @@ def add_fpn(model, fpn_level_info):
                 pad=1,
                 stride=1,
                 weight_init=xavier_fill,
-                bias_init=const_fill(0.0)
+                bias_init=const_fill(0.0),
+                conv_algorithm = conv3x3_algorithm[i]
             )
         blobs_fpn += [fpn_blob]
         spatial_scales += [fpn_level_info.spatial_scales[i]]
@@ -325,6 +329,8 @@ def add_fpn_rpn_outputs(model, blobs_in, dim_in, spatial_scales):
     num_anchors = len(cfg.FPN.RPN_ASPECT_RATIOS)
     dim_out = dim_in
 
+    conv3x3_algorithm = [1, 1, 1, 1, 1]
+    #conv3x3_algorithm = [1, 1, 1, 1, 0]
     k_max = cfg.FPN.RPN_MAX_LEVEL  # coarsest level of pyramid
     k_min = cfg.FPN.RPN_MIN_LEVEL  # finest level of pyramid
     assert len(blobs_in) == k_max - k_min + 1
@@ -347,7 +353,8 @@ def add_fpn_rpn_outputs(model, blobs_in, dim_in, spatial_scales):
                 pad=1,
                 stride=1,
                 weight_init=gauss_fill(0.01),
-                bias_init=const_fill(0.0)
+                bias_init=const_fill(0.0),
+                conv_algorithm = conv3x3_algorithm[lvl-k_min]
             )
             model.Relu(conv_rpn_fpn, conv_rpn_fpn)
             # Proposal classification scores
@@ -387,7 +394,8 @@ def add_fpn_rpn_outputs(model, blobs_in, dim_in, spatial_scales):
                 pad=1,
                 stride=1,
                 weight='conv_rpn_fpn' + sk_min + '_w',
-                bias='conv_rpn_fpn' + sk_min + '_b'
+                bias='conv_rpn_fpn' + sk_min + '_b',
+                conv_algorithm = conv3x3_algorithm[lvl-k_min]
             )
             model.Relu(conv_rpn_fpn, conv_rpn_fpn)
             # Proposal classification scores

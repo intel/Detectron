@@ -348,7 +348,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         """
         assert dim_in == dim_out
         assert up_scale % 2 == 0, 'Scale should be even'
-
         def upsample_filt(size):
             factor = (size + 1) // 2
             if size % 2 == 1:
@@ -388,7 +387,8 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         weight_init=None,
         bias_init=None,
         suffix='_bn',
-        inplace=False
+        inplace=False,
+        conv_algorithm=0
     ):
         """ConvAffine adds a Conv op followed by a AffineChannel op (which
         replaces BN during fine tuning).
@@ -405,7 +405,8 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             dilation=dilation,
             weight_init=weight_init,
             bias_init=bias_init,
-            no_bias=1
+            no_bias=1,
+            conv_algorithm=conv_algorithm
         )
         blob_out = self.AffineChannel(
             conv_blob, prefix + suffix, dim=dim_out, inplace=inplace

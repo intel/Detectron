@@ -146,6 +146,7 @@ def mask_rcnn_fcn_head_v1upXconvs(
     dilation = cfg.MRCNN.DILATION
     dim_inner = cfg.MRCNN.DIM_REDUCED
 
+    conv3x3_algorithm = [1, 1, 1, 1] # 1 for winograd_conv, 0 for direct_conv
     for i in range(num_convs):
         current = model.Conv(
             current,
@@ -157,7 +158,8 @@ def mask_rcnn_fcn_head_v1upXconvs(
             pad=1 * dilation,
             stride=1,
             weight_init=(cfg.MRCNN.CONV_INIT, {'std': 0.001}),
-            bias_init=('ConstantFill', {'value': 0.})
+            bias_init=('ConstantFill', {'value': 0.}),
+            conv_algorithm = conv3x3_algorithm[i]
         )
         current = model.Relu(current, current)
         dim_in = dim_inner

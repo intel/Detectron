@@ -70,6 +70,17 @@ def add_stage(
 ):
     """Add a ResNet stage to the model by stacking n residual blocks."""
     # e.g., prefix = res2
+    #algorithm = {
+    #        "res2" : [1, 1, 1],
+    #        "res3" : [0, 0, 0, 0],
+    #        "res4" : [1, 1, 1, 1, 1, 1],
+    #        "res5" : [0, 0, 1]}
+    algorithm = {
+            "res2" : [1, 1, 1],  # 1 for winograd_conv, 0 for direct_conv
+            "res3" : [1, 1, 1, 1],
+            "res4" : [1, 1, 1, 1, 1, 1],
+            "res5" : [1, 1, 1]}
+    alg = 1
     for i in range(n):
         blob_in = add_residual_block(
             model,
@@ -82,7 +93,8 @@ def add_stage(
             stride_init,
             # Not using inplace for the last block;
             # it may be fetched externally or used by FPN
-            inplace_sum=i < n - 1
+            inplace_sum=i < n - 1,
+            conv3x3_algorithm = algorithm[prefix][i] 
         )
         dim_in = dim_out
     return blob_in, dim_in
@@ -101,6 +113,7 @@ def add_ResNet_convX_body(model, block_counts):
     dim_bottleneck = cfg.RESNETS.NUM_GROUPS * cfg.RESNETS.WIDTH_PER_GROUP
     (n1, n2, n3) = block_counts[:3]
     s, dim_in = add_stage(model, 'res2', p, n1, dim_in, 256, dim_bottleneck, 1)
+
     if freeze_at == 2:
         model.StopGradient(s, s)
     s, dim_in = add_stage(
@@ -159,7 +172,8 @@ def add_residual_block(
     dim_inner,
     dilation,
     stride_init=2,
-    inplace_sum=False
+    inplace_sum=False,
+    conv3x3_algorithm = 0
 ):
     """Add a residual block to the model."""
     # prefix = res<stage>_<sub_stage>, e.g., res2_3
@@ -180,7 +194,8 @@ def add_residual_block(
         prefix,
         dim_inner,
         group=cfg.RESNETS.NUM_GROUPS,
-        dilation=dilation
+        dilation=dilation,
+        conv3x3_algorithm = conv3x3_algorithm 
     )
 
     # sum -> ReLU
@@ -282,7 +297,8 @@ def bottleneck_transformation(
     prefix,
     dim_inner,
     dilation=1,
-    group=1
+    group=1,
+    conv3x3_algorithm=0
 ):
     """Add a bottleneck transformation to the model."""
     # In original resnet, stride=2 is on 1x1.
@@ -313,7 +329,8 @@ def bottleneck_transformation(
         pad=1 * dilation,
         dilation=dilation,
         group=group,
-        inplace=True
+        inplace=True,
+        conv_algorithm=conv3x3_algorithm
     )
     cur = model.Relu(cur, cur)
 
