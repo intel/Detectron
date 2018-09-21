@@ -23,6 +23,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import os
 from detectron.core.config import cfg
 from detectron.utils.net import get_group_gn
 
@@ -71,16 +72,11 @@ def add_stage(
     """Add a ResNet stage to the model by stacking n residual blocks."""
     # e.g., prefix = res2
     #algorithm = {
-    #        "res2" : [1, 1, 1],
-    #        "res3" : [0, 0, 0, 0],
+    #        "res2" : [1, 1, 1],  # 1 for winograd_conv, 0 for direct_conv
+    #        "res3" : [1, 1, 1, 1],
     #        "res4" : [1, 1, 1, 1, 1, 1],
-    #        "res5" : [0, 0, 1]}
-    algorithm = {
-            "res2" : [1, 1, 1],  # 1 for winograd_conv, 0 for direct_conv
-            "res3" : [1, 1, 1, 1],
-            "res4" : [1, 1, 1, 1, 1, 1],
-            "res5" : [1, 1, 1]}
-    alg = 1
+    #        "res5" : [1, 1, 1]}
+    algorithm = int(os.environ.get('CONV_ALGORITHM'))
     for i in range(n):
         blob_in = add_residual_block(
             model,
@@ -94,7 +90,7 @@ def add_stage(
             # Not using inplace for the last block;
             # it may be fetched externally or used by FPN
             inplace_sum=i < n - 1,
-            conv3x3_algorithm = algorithm[prefix][i] 
+            conv3x3_algorithm = algorithm  #algorithm[prefix][i] 
         )
         dim_in = dim_out
     return blob_in, dim_in
