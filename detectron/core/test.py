@@ -30,6 +30,7 @@ from __future__ import unicode_literals
 
 from collections import defaultdict
 import cv2
+import os
 import logging
 import numpy as np
 
@@ -63,10 +64,9 @@ def im_detect_all(model, im, box_proposals, timers=None):
         scores, boxes, im_scale = im_detect_bbox_aug(model, im, box_proposals)
     else:
         scores, boxes, im_scale = im_detect_bbox(
-            model, im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, boxes=box_proposals
+            model, im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, timers, boxes=box_proposals
         )
     timers['im_detect_bbox'].toc()
-
     # score and boxes are from the whole image after score thresholding and nms
     # (they are not separated by class)
     # cls_boxes boxes and scores are separated by class and in the format used
@@ -80,7 +80,7 @@ def im_detect_all(model, im, box_proposals, timers=None):
         if cfg.TEST.MASK_AUG.ENABLED:
             masks = im_detect_mask_aug(model, im, boxes)
         else:
-            masks = im_detect_mask(model, im_scale, boxes)
+            masks = im_detect_mask(model, im_scale, boxes, timers)
         timers['im_detect_mask'].toc()
 
         timers['misc_mask'].tic()
@@ -118,7 +118,7 @@ def im_conv_body_only(model, im, target_scale, target_max_size):
     return im_scale
 
 
-def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
+def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, boxes=None):
     """Bounding box object detection for an image with given box proposals.
 
     Arguments:
@@ -134,6 +134,10 @@ def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
         im_scales (list): list of image scales used in the input blob (as
             returned by _get_blobs and for use with im_detect_mask, etc.)
     """
+    if timers is None:
+        timers = defaultdict(Timer)
+
+    timers['data1'].tic()
     inputs, im_scale = _get_blobs(im, boxes, target_scale, target_max_size)
 
     # When mapping from image ROIs to feature map ROIs, there's some aliasing
@@ -152,11 +156,16 @@ def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
     # Add multi-level rois for FPN
     if cfg.FPN.MULTILEVEL_ROIS and not cfg.MODEL.FASTER_RCNN:
         _add_multilevel_rois_for_test(inputs, 'rois')
-
     for k, v in inputs.items():
         workspace.FeedBlob(core.ScopedName(k), v)
+    timers['data1'].toc()
+    # run first time to warm up
+    if os.environ.get('EPOCH2')=="1":
+        workspace.RunNet(model.net.Proto().name)
+    timers['run'].tic()
     workspace.RunNet(model.net.Proto().name)
-
+    timers['run'].toc()
+    timers['result'].tic()
     # Read out blobs
     if cfg.MODEL.FASTER_RCNN:
         rois = workspace.FetchBlob(core.ScopedName('rois'))
@@ -185,12 +194,12 @@ def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
     else:
         # Simply repeat the boxes, once for each class
         pred_boxes = np.tile(boxes, (1, scores.shape[1]))
-
+        
     if cfg.DEDUP_BOXES > 0 and not cfg.MODEL.FASTER_RCNN:
         # Map scores and predictions back to the original set of boxes
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
-
+    timers['result'].toc()
     return scores, pred_boxes, im_scale
 
 
@@ -370,7 +379,7 @@ def im_detect_bbox_aspect_ratio(
     return scores_ar, boxes_inv
 
 
-def im_detect_mask(model, im_scale, boxes):
+def im_detect_mask(model, im_scale, boxes, timers=None):
     """Infer instance segmentation masks. This function must be called after
     im_detect_bbox as it assumes that the Caffe2 workspace is already populated
     with the necessary blobs.
@@ -386,6 +395,9 @@ def im_detect_mask(model, im_scale, boxes):
             output by the network (must be processed by segm_results to convert
             into hard masks in the original image coordinate space)
     """
+    if timers is None:
+        timers = defaultdict(Timer)
+    timers['data_mask'].tic()
     M = cfg.MRCNN.RESOLUTION
     if boxes.shape[0] == 0:
         pred_masks = np.zeros((0, M, M), np.float32)
@@ -398,8 +410,14 @@ def im_detect_mask(model, im_scale, boxes):
 
     for k, v in inputs.items():
         workspace.FeedBlob(core.ScopedName(k), v)
+    timers['data_mask'].toc()
+    #run first time to warm up
+    if os.environ.get('EPOCH2')=="1":
+        workspace.RunNet(model.mask_net.Proto().name)
+    timers['run_mask'].tic()
     workspace.RunNet(model.mask_net.Proto().name)
-
+    timers['run_mask'].toc()
+    timers['result_mask'].tic()
     # Fetch masks
     pred_masks = workspace.FetchBlob(
         core.ScopedName('mask_fcn_probs')
@@ -409,7 +427,7 @@ def im_detect_mask(model, im_scale, boxes):
         pred_masks = pred_masks.reshape([-1, cfg.MODEL.NUM_CLASSES, M, M])
     else:
         pred_masks = pred_masks.reshape([-1, 1, M, M])
-
+    timers['result_mask'].toc()
     return pred_masks
 
 
@@ -941,6 +959,8 @@ def _add_multilevel_rois_for_test(blobs, name):
 
 def _get_blobs(im, rois, target_scale, target_max_size):
     """Convert an image and RoIs within that image into network inputs."""
+
+
     blobs = {}
     blobs['data'], im_scale, blobs['im_info'] = \
         blob_utils.get_image_blob(im, target_scale, target_max_size)

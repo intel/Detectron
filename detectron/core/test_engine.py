@@ -260,15 +260,14 @@ def test_net(
             cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(
                 model, im, box_proposals, timers
             )
-        
         if os.environ.get('DPROFILE')=="1" and ob != None:
             logging.warning("enter profile log")
             logging.warning("net observer time = {}".format(ob.average_time()))
             logging.warning("net observer time = {}".format(ob.average_time_children()))
         if os.environ.get('DPROFILE')=="1" and ob_mask != None:
-            logging.warning("mask net observer time = {}".format(ob.average_time()))
-            logging.warning("mask net observer time = {}".format(ob.average_time_children()))
-
+            logging.warning("mask net observer time = {}".format(ob_mask.average_time()))
+            logging.warning("mask net observer time = {}".format(ob_mask.average_time_children()))
+        
         extend_results(i, all_boxes, cls_boxes_i)
         if cls_segms_i is not None:
             extend_results(i, all_segms, cls_segms_i)
@@ -298,7 +297,6 @@ def test_net(
                     start_ind + num_images, det_time, misc_time, eta
                 )
             )
-
         if cfg.VIS:
             im_name = os.path.splitext(os.path.basename(entry['image']))[0]
             vis_utils.vis_one_image(
@@ -313,9 +311,11 @@ def test_net(
                 dataset=dataset,
                 show_class=True
             )
+        for key, value in timers.items():
+            logger.info('{} : {}'.format(key, value.average_time))
     #remove observer
     if ob != None: 
-        modle.net.RemoveObserver(ob)
+        model.net.RemoveObserver(ob)
     if ob_mask != None:
         model.mask_net.RemoveObserver(ob)
 

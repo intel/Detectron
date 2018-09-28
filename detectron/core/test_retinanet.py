@@ -22,6 +22,7 @@ from __future__ import unicode_literals
 
 import numpy as np
 import logging
+import os
 from collections import defaultdict
 
 from caffe2.python import core, workspace
@@ -72,6 +73,7 @@ def im_detect_bbox(model, im, timers=None):
     # recomputing them per image only brings a small overhead
     anchors = _create_cell_anchors()
     timers['im_detect_bbox'].tic()
+    timers['data1'].tic()
     k_max, k_min = cfg.FPN.RPN_MAX_LEVEL, cfg.FPN.RPN_MIN_LEVEL
     A = cfg.RETINANET.SCALES_PER_OCTAVE * len(cfg.RETINANET.ASPECT_RATIOS)
     inputs = {}
@@ -84,8 +86,12 @@ def im_detect_bbox(model, im, timers=None):
         box_preds.append(core.ScopedName('retnet_bbox_pred_{}'.format(suffix)))
     for k, v in inputs.items():
         workspace.FeedBlob(core.ScopedName(k), v.astype(np.float32, copy=False))
-
+    timers['data1'].toc()
+    if os.environ.get('EPOCH2')=="1":
+        workspace.RunNet(model.net.Proto().name)
+    timers['run'].tic()
     workspace.RunNet(model.net.Proto().name)
+    timers['run'].toc()
     cls_probs = workspace.FetchBlobs(cls_probs)
     box_preds = workspace.FetchBlobs(box_preds)
 
