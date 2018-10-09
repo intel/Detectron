@@ -124,7 +124,7 @@ def main(args):
     assert not cfg.TEST.PRECOMPUTED_PROPOSALS, \
         'Models that require precomputed proposals are not supported'
 
-    model,_,_ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id = args.device_id)
+    model,_,_,_ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id = args.device_id)
     dummy_coco_dataset = dummy_datasets.get_coco_dataset()
 
     if os.path.isdir(args.im_or_folder):
