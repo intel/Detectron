@@ -76,7 +76,10 @@ def add_stage(
     #        "res3" : [1, 1, 1, 1],
     #        "res4" : [1, 1, 1, 1, 1, 1],
     #        "res5" : [1, 1, 1]}
-    algorithm = int(os.environ.get('CONV_ALGORITHM'))
+    if os.environ.get('CONV_ALGORITHM') is None:
+        algorithm = 0
+    else:
+        algorithm = int(os.environ.get('CONV_ALGORITHM'))
     for i in range(n):
         blob_in = add_residual_block(
             model,

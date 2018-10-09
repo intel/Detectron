@@ -186,8 +186,11 @@ def add_fpn(model, fpn_level_info):
     # Post-hoc scale-specific 3x3 convs
     blobs_fpn = []
     spatial_scales = []
-
-    conv3x3_algorithm = int(os.environ.get('CONV_ALGORITHM'))
+   
+    if os.environ.get('CONV_ALGORITHM') is None:
+        conv3x3_algorithm = 0
+    else:
+        conv3x3_algorithm = int(os.environ.get('CONV_ALGORITHM'))
     #conv3x3_algorithm = [1, 1, 1, 1] # 1 for winograd_conv, 0 for direct_conv
     for i in range(num_backbone_stages):
         if cfg.FPN.USE_GN:
@@ -329,8 +332,10 @@ def add_fpn_rpn_outputs(model, blobs_in, dim_in, spatial_scales):
     """Add RPN on FPN specific outputs."""
     num_anchors = len(cfg.FPN.RPN_ASPECT_RATIOS)
     dim_out = dim_in
-
-    conv3x3_algorithm = int(os.environ.get('CONV_ALGORITHM'))
+    if os.environ.get('CONV_ALGORITHM') is None:
+        conv3x3_algorithm = 0
+    else:
+        conv3x3_algorithm = int(os.environ.get('CONV_ALGORITHM'))
     #conv3x3_algorithm = [1, 1, 1, 1, 1]
     k_max = cfg.FPN.RPN_MAX_LEVEL  # coarsest level of pyramid
     k_min = cfg.FPN.RPN_MIN_LEVEL  # finest level of pyramid
