@@ -234,7 +234,7 @@ def test_net(
     roidb, dataset, start_ind, end_ind, total_num_images = get_roidb_and_dataset(
         dataset_name, proposal_file, ind_range
     )
-    model, ob, ob_mask = initialize_model_from_cfg(weights_file, gpu_id=gpu_id)
+    model, ob, ob_mask, ob_keypoint = initialize_model_from_cfg(weights_file, gpu_id=gpu_id)
     num_images = len(roidb)
     num_classes = cfg.MODEL.NUM_CLASSES
     all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
@@ -267,7 +267,9 @@ def test_net(
         if os.environ.get('DPROFILE')=="1" and ob_mask != None:
             logging.warning("mask net observer time = {}".format(ob_mask.average_time()))
             logging.warning("mask net observer time = {}".format(ob_mask.average_time_children()))
-        
+        if os.environ.get('DPROFILE')=="1" and ob_mask != None:
+            logging.warning("keypoint net observer time = {}".format(ob_keypoint.average_time()))
+            logging.warning("keypoint net observer time = {}".format(ob_keypoint.average_time_children()))
         extend_results(i, all_boxes, cls_boxes_i)
         if cls_segms_i is not None:
             extend_results(i, all_segms, cls_segms_i)
@@ -317,8 +319,9 @@ def test_net(
     if ob != None: 
         model.net.RemoveObserver(ob)
     if ob_mask != None:
-        model.mask_net.RemoveObserver(ob)
-
+        model.mask_net.RemoveObserver(ob_mask)
+    if ob_keypoint != None:
+        model.keypoint_net.RemoveObserver(ob_keypoint)
     
     cfg_yaml = yaml.dump(cfg)
     if ind_range is not None:
@@ -348,6 +351,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0):
     )
     ob=None
     ob_mask=None
+    ob_keypoint=None
     model_builder.add_inference_inputs(model)
     if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
         logging.warning('optimize....................')
@@ -366,8 +370,13 @@ def initialize_model_from_cfg(weights_file, gpu_id=0):
             ob_mask = model.mask_net.AddObserver("TimeObserver")
 
     if cfg.MODEL.KEYPOINTS_ON:
+        if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
+            logging.warning('optimize....................')
+            tf.optimizeForIDEEP(model.keypoint_net)
         workspace.CreateNet(model.keypoint_net)
-    return model, ob, ob_mask
+        if os.environ.get('DPROFILE')=="1":
+            ob_keypoint = model.keypoint_net.AddObserver("TimeObserver")
+    return model, ob, ob_mask, ob_keypoint
 
 
 def get_roidb_and_dataset(dataset_name, proposal_file, ind_range):
