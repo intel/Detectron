@@ -82,11 +82,21 @@ def collect(inputs, is_training):
     # rois are in [[batch_idx, x0, y0, x1, y2], ...] format
     # Combine predictions across all levels and retain the top scoring
     rois = np.concatenate([blob.data for blob in roi_inputs])
-    scores = np.concatenate([blob.data for blob in score_inputs]).squeeze()
-    inds = np.argsort(-scores)[:post_nms_topN]
-    rois = rois[inds, :]
-    return rois
+    scores = np.concatenate([blob.data for blob in score_inputs])
 
+    batch_size = int(max(rois[:,0])+1)
+    for i in range(batch_size):
+        idx = (rois[:, 0] == i)
+        per_image_rois = rois[idx, :]
+        assert per_image_rois.shape[0] > 0, "There's no rois in the {}th image.".format(i+1)
+        per_image_score = (scores[idx, :]).squeeze()
+        inds = np.argsort(-per_image_score)[:post_nms_topN]
+        per_image_rois = per_image_rois[inds, :]
+        if i == 0:
+            batch_roi = per_image_rois
+        else:
+            batch_roi = np.vstack((batch_roi, per_image_rois))
+    return batch_roi
 
 def distribute(rois, label_blobs, outputs, train):
     """To understand the output blob order see return value of

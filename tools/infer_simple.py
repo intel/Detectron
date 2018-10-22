@@ -105,11 +105,32 @@ def parse_args():
         default=0,
         type=int
     )
+    parser.add_argument(
+        '--batch_size',
+        dest='batch_size',
+        default=1,
+        type=int
+    )
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
     return parser.parse_args()
 
+def batch_image(im_list, batch_size):
+    bs = batch_size
+    fnames = []
+    fname = []
+    for idx, im_name in enumerate(im_list):
+        bs -= 1
+        fname.append(im_name)
+        if bs == 0:
+            fnames.append(fname)
+            fname = []
+            bs = batch_size
+    if len(fname) > 0:
+        fnames.append(fname)
+
+    return fnames
 
 def main(args):
     logger = logging.getLogger(__name__)
@@ -132,12 +153,13 @@ def main(args):
     else:
         im_list = [args.im_or_folder]
 
-    for i, im_name in enumerate(im_list):
-        out_name = os.path.join(
-            args.output_dir, '{}'.format(os.path.basename(im_name) + '.' + args.output_ext)
-        )
-        logger.info('Processing {} -> {}'.format(im_name, out_name))
-        im = cv2.imread(im_name)
+    fnames = batch_image(im_list, args.batch_size)
+    for i, im_name in enumerate(fnames):
+        im = []
+        for j, name in enumerate(im_name):
+            image = cv2.imread(name)
+            im.append(image)
+
         timers = defaultdict(Timer)
         t = time.time()
         with c2_utils.NamedCudaScope(args.device_id):
@@ -147,28 +169,41 @@ def main(args):
         logger.info('Inference time: {:.3f}s'.format(time.time() - t))
         for k, v in timers.items():
             logger.info(' | {}: {:.3f}s'.format(k, v.average_time))
+
         if i == 0:
             logger.info(
-                ' \ Note: inference on the first image will be slower than the '
+                ' \ Note: inference on the first batch will be slower than the '
                 'rest (caches and auto-tuning need to warm up)'
             )
 
-        vis_utils.vis_one_image(
-            im[:, :, ::-1],  # BGR -> RGB for visualization
-            im_name,
-            args.output_dir,
-            cls_boxes,
-            cls_segms,
-            cls_keyps,
-            dataset=dummy_coco_dataset,
-            box_alpha=0.3,
-            show_class=True,
-            thresh=0.7,
-            kp_thresh=2,
-            ext=args.output_ext,
-            out_when_no_box=args.out_when_no_box
-        )
+        cls_segm = None
+        cls_keyp = None
+        print("args.batch_size = {}".format(args.batch_size))
+        for bs in range(args.batch_size):
+            image = im[bs]
+            if cls_segms != None:
+                cls_segm = cls_segms[bs]
+            if cls_keyp != None:
+                cls_keyp = cls_keyps[bs]
 
+            cls_box = cls_boxes[bs]
+            image_name = fnames[i][bs].split("/")[-1]
+
+            vis_utils.vis_one_image(
+                image[:, :, ::-1],  # BGR -> RGB for visualization
+                image_name,
+                args.output_dir,
+                cls_box,
+                cls_segm,
+                cls_keyp,
+                dataset=dummy_coco_dataset,
+                box_alpha=0.3,
+                show_class=True,
+                thresh=0.7,
+                kp_thresh=2,
+                ext=args.output_ext,
+                out_when_no_box=args.out_when_no_box
+            )
 
 if __name__ == '__main__':
     workspace.GlobalInit(['caffe2', '--caffe2_log_level=0'])

@@ -61,9 +61,10 @@ def im_detect_all(model, im, box_proposals, timers=None):
 
     timers['im_detect_bbox'].tic()
     if cfg.TEST.BBOX_AUG.ENABLED:
+        # TODO: add multi-batch for this function
         scores, boxes, im_scale = im_detect_bbox_aug(model, im, box_proposals)
     else:
-        scores, boxes, im_scale = im_detect_bbox(
+        scores, boxes, im_scale, batch_indices = im_detect_bbox(
             model, im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, timers, boxes=box_proposals
         )
     timers['im_detect_bbox'].toc()
@@ -72,7 +73,26 @@ def im_detect_all(model, im, box_proposals, timers=None):
     # cls_boxes boxes and scores are separated by class and in the format used
     # for evaluating results
     timers['misc_bbox'].tic()
-    scores, boxes, cls_boxes = box_results_with_nms_and_limit(scores, boxes)
+
+    cls_boxes_list = []
+    batch_cls_boxes = []
+    batch_size = int(max(batch_indices)+1)
+    for i in range(batch_size):
+        idx = (batch_indices == i)
+        per_image_scores = scores[idx,:]
+        per_image_boxes = boxes[idx,:]
+        per_image_scores, per_image_boxes, per_image_cls_boxes = box_results_with_nms_and_limit(per_image_scores, per_image_boxes)
+        cls_boxes_list.append(per_image_cls_boxes)
+        if i == 0:
+            batch_scores = per_image_scores
+            batch_boxes = per_image_boxes
+        else:
+            batch_scores = np.hstack((batch_scores, per_image_scores))
+            batch_boxes = np.vstack((batch_boxes, per_image_boxes))
+            batch_cls_boxes.extend(per_image_cls_boxes)
+    scores = batch_scores
+    boxes = batch_boxes
+    cls_boxes = batch_cls_boxes
     timers['misc_bbox'].toc()
 
     if cfg.MODEL.MASK_ON and boxes.shape[0] > 0:
@@ -85,7 +105,7 @@ def im_detect_all(model, im, box_proposals, timers=None):
 
         timers['misc_mask'].tic()
         cls_segms = segm_results(
-            cls_boxes, masks, boxes, im.shape[0], im.shape[1]
+            cls_boxes, masks, boxes, im[0].shape[0], im[0].shape[1]
         )
         timers['misc_mask'].toc()
     else:
@@ -105,7 +125,7 @@ def im_detect_all(model, im, box_proposals, timers=None):
     else:
         cls_keyps = None
 
-    return cls_boxes, cls_segms, cls_keyps
+    return cls_boxes_list, cls_segms, cls_keyps
 
 
 def im_conv_body_only(model, im, target_scale, target_max_size):
@@ -171,6 +191,7 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, boxes=
         rois = workspace.FetchBlob(core.ScopedName('rois'))
         # unscale back to raw image space
         boxes = rois[:, 1:5] / im_scale
+        batch_indices = rois[:,0]
 
     # Softmax class probabilities
     scores = workspace.FetchBlob(core.ScopedName('cls_prob')).squeeze()
@@ -188,22 +209,23 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, boxes=
         pred_boxes = box_utils.bbox_transform(
             boxes, box_deltas, cfg.MODEL.BBOX_REG_WEIGHTS
         )
-        pred_boxes = box_utils.clip_tiled_boxes(pred_boxes, im.shape)
+        pred_boxes = box_utils.clip_tiled_boxes(pred_boxes, im[0].shape)
         if cfg.MODEL.CLS_AGNOSTIC_BBOX_REG:
             pred_boxes = np.tile(pred_boxes, (1, scores.shape[1]))
     else:
         # Simply repeat the boxes, once for each class
         pred_boxes = np.tile(boxes, (1, scores.shape[1]))
-        
+
     if cfg.DEDUP_BOXES > 0 and not cfg.MODEL.FASTER_RCNN:
         # Map scores and predictions back to the original set of boxes
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
     timers['result'].toc()
-    return scores, pred_boxes, im_scale
+    return scores, pred_boxes, im_scale, batch_indices
 
 
 def im_detect_bbox_aug(model, im, box_proposals=None):
+    # TODO: add multi-batch for this function
     """Performs bbox detection with test-time augmentations.
     Function signature is the same as for im_detect_bbox.
     """

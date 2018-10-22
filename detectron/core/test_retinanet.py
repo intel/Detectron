@@ -98,6 +98,8 @@ def im_detect_bbox(model, im, timers=None):
     # here the boxes_all are [x0, y0, x1, y1, score]
     boxes_all = defaultdict(list)
 
+    batch_size = cls_probs[0].shape[0]
+    boxes_all_list = [boxes_all] * batch_size
     cnt = 0
     for lvl in range(k_min, k_max + 1):
         # create cell anchors array
@@ -117,81 +119,88 @@ def im_detect_bbox(model, im, timers=None):
         if cfg.RETINANET.SOFTMAX:
             cls_prob = cls_prob[:, :, 1::, :, :]
 
-        cls_prob_ravel = cls_prob.ravel()
-        # In some cases [especially for very small img sizes], it's possible that
-        # candidate_ind is empty if we impose threshold 0.05 at all levels. This
-        # will lead to errors since no detections are found for this image. Hence,
-        # for lvl 7 which has small spatial resolution, we take the threshold 0.0
-        th = cfg.RETINANET.INFERENCE_TH if lvl < k_max else 0.0
-        candidate_inds = np.where(cls_prob_ravel > th)[0]
-        if (len(candidate_inds) == 0):
-            continue
+        for i in range(batch_size):
+            cls_prob_ravel = cls_prob[i,:].ravel()
 
-        pre_nms_topn = min(cfg.RETINANET.PRE_NMS_TOP_N, len(candidate_inds))
-        inds = np.argpartition(
-            cls_prob_ravel[candidate_inds], -pre_nms_topn)[-pre_nms_topn:]
-        inds = candidate_inds[inds]
+            # In some cases [especially for very small img sizes], it's possible that
+            # candidate_ind is empty if we impose threshold 0.05 at all levels. This
+            # will lead to errors since no detections are found for this image. Hence,
+            # for lvl 7 which has small spatial resolution, we take the threshold 0.0
+            th = cfg.RETINANET.INFERENCE_TH if lvl < k_max else 0.0
+            candidate_inds = np.where(cls_prob_ravel > th)[0]
+            if (len(candidate_inds) == 0):
+                continue
 
-        inds_5d = np.array(np.unravel_index(inds, cls_prob.shape)).transpose()
-        classes = inds_5d[:, 2]
-        anchor_ids, y, x = inds_5d[:, 1], inds_5d[:, 3], inds_5d[:, 4]
-        scores = cls_prob[:, anchor_ids, classes, y, x]
+            pre_nms_topn = min(cfg.RETINANET.PRE_NMS_TOP_N, len(candidate_inds))
+            inds = np.argpartition(
+                    cls_prob_ravel[candidate_inds], -pre_nms_topn)[-pre_nms_topn:]
+            inds = candidate_inds[inds]
 
-        boxes = np.column_stack((x, y, x, y)).astype(dtype=np.float32)
-        boxes *= stride
-        boxes += cell_anchors[anchor_ids, :]
+            inds_4d = np.array(np.unravel_index(inds, (cls_prob[i,:]).shape)).transpose()
+            classes = inds_4d[:, 1]
+            anchor_ids, y, x = inds_4d[:, 0], inds_4d[:, 2], inds_4d[:, 3]
+            scores = cls_prob[i, anchor_ids, classes, y, x]
+            boxes = np.column_stack((x, y, x, y)).astype(dtype=np.float32)
+            boxes *= stride
+            boxes += cell_anchors[anchor_ids, :]
 
-        if not cfg.RETINANET.CLASS_SPECIFIC_BBOX:
-            box_deltas = box_pred[0, anchor_ids, :, y, x]
-        else:
-            box_cls_inds = classes * 4
-            box_deltas = np.vstack(
-                [box_pred[0, ind:ind + 4, yi, xi]
-                 for ind, yi, xi in zip(box_cls_inds, y, x)]
-            )
-        pred_boxes = (
-            box_utils.bbox_transform(boxes, box_deltas)
-            if cfg.TEST.BBOX_REG else boxes)
-        pred_boxes /= im_scale
-        pred_boxes = box_utils.clip_tiled_boxes(pred_boxes, im.shape)
-        box_scores = np.zeros((pred_boxes.shape[0], 5))
-        box_scores[:, 0:4] = pred_boxes
-        box_scores[:, 4] = scores
+            if not cfg.RETINANET.CLASS_SPECIFIC_BBOX:
+                box_deltas = box_pred[i, anchor_ids, :, y, x]
+            else:
+                box_cls_inds = classes * 4
+                box_deltas = np.vstack(
+                   [box_pred[i, ind:ind + 4, yi, xi]
+                   for ind, yi, xi in zip(box_cls_inds, y, x)]
+                )
+            pred_boxes = (
+                    box_utils.bbox_transform(boxes, box_deltas)
+                    if cfg.TEST.BBOX_REG else boxes)
+            pred_boxes /= im_scale
+            pred_boxes = box_utils.clip_tiled_boxes(pred_boxes, im[0].shape)
+            box_scores = np.zeros((pred_boxes.shape[0], 5))
+            box_scores[:, 0:4] = pred_boxes
+            box_scores[:, 4] = scores
 
-        for cls in range(1, cfg.MODEL.NUM_CLASSES):
-            inds = np.where(classes == cls - 1)[0]
-            if len(inds) > 0:
-                boxes_all[cls].extend(box_scores[inds, :])
+            for cls in range(1, cfg.MODEL.NUM_CLASSES):
+                inds = np.where(classes == cls - 1)[0]
+                if len(inds) > 0:
+                    boxes_all_list[i][cls].extend(box_scores[inds, :])
+
     timers['im_detect_bbox'].toc()
 
-    # Combine predictions across all levels and retain the top scoring by class
-    timers['misc_bbox'].tic()
-    detections = []
-    for cls, boxes in boxes_all.items():
-        cls_dets = np.vstack(boxes).astype(dtype=np.float32)
-        # do class specific nms here
-        keep = box_utils.nms(cls_dets, cfg.TEST.NMS)
-        cls_dets = cls_dets[keep, :]
-        out = np.zeros((len(keep), 6))
-        out[:, 0:5] = cls_dets
-        out[:, 5].fill(cls)
-        detections.append(out)
+    cls_boxes_list = []
+    for i in range(batch_size):
+        boxes_all = boxes_all_list[i]
+        # Combine predictions across all levels and retain the top scoring by class
+        timers['misc_bbox'].tic()
+        detections = []
+        for cls, boxes in boxes_all.items():
+            cls_dets = np.vstack(boxes).astype(dtype=np.float32)
+            # do class specific nms here
+            keep = box_utils.nms(cls_dets, cfg.TEST.NMS)
+            cls_dets = cls_dets[keep, :]
+            out = np.zeros((len(keep), 6))
+            out[:, 0:5] = cls_dets
+            out[:, 5].fill(cls)
+            detections.append(out)
 
-    # detections (N, 6) format:
-    #   detections[:, :4] - boxes
-    #   detections[:, 4] - scores
-    #   detections[:, 5] - classes
-    detections = np.vstack(detections)
-    # sort all again
-    inds = np.argsort(-detections[:, 4])
-    detections = detections[inds[0:cfg.TEST.DETECTIONS_PER_IM], :]
+        # detections (N, 6) format:
+        #   detections[:, :4] - boxes
+        #   detections[:, 4] - scores
+        #   detections[:, 5] - classes
+        detections = np.vstack(detections)
+        # sort all again
+        inds = np.argsort(-detections[:, 4])
+        detections = detections[inds[0:cfg.TEST.DETECTIONS_PER_IM], :]
 
-    # Convert the detections to image cls_ format (see core/test_engine.py)
-    num_classes = cfg.MODEL.NUM_CLASSES
-    cls_boxes = [[] for _ in range(cfg.MODEL.NUM_CLASSES)]
-    for c in range(1, num_classes):
-        inds = np.where(detections[:, 5] == c)[0]
-        cls_boxes[c] = detections[inds, :5]
+        # Convert the detections to image cls_ format (see core/test_engine.py)
+        num_classes = cfg.MODEL.NUM_CLASSES
+        cls_boxes = [[] for _ in range(cfg.MODEL.NUM_CLASSES)]
+        for c in range(1, num_classes):
+            inds = np.where(detections[:, 5] == c)[0]
+            cls_boxes[c] = detections[inds, :5]
+        cls_boxes_list.append(cls_boxes)
+
     timers['misc_bbox'].toc()
 
-    return cls_boxes
+    return cls_boxes_list

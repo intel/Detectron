@@ -86,8 +86,9 @@ class GenerateProposalsOp(object):
         rois = np.empty((0, 5), dtype=np.float32)
         roi_probs = np.empty((0, 1), dtype=np.float32)
         for im_i in range(num_images):
+            # images in one batch have the same im_info. Thus we have im_info.shape[0]=1
             im_i_boxes, im_i_probs = self.proposals_for_one_image(
-                im_info[im_i, :], all_anchors, bbox_deltas[im_i, :, :, :],
+                im_info[0, :], all_anchors, bbox_deltas[im_i, :, :, :],
                 scores[im_i, :, :, :]
             )
             batch_inds = im_i * np.ones(
