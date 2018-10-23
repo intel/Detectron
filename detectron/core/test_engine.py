@@ -254,7 +254,8 @@ def test_net(
             # in-network RPN; 1-stage models don't require proposals.
             box_proposals = None
 
-        im = cv2.imread(entry['image'])
+        im = []
+        im.append(cv2.imread(entry['image']))
         print("im is {} and i is {} ".format(entry['image'], i))
         with c2_utils.NamedCudaScope(gpu_id):
             cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(
@@ -270,11 +271,11 @@ def test_net(
         if os.environ.get('DPROFILE')=="1" and ob_mask != None:
             logging.warning("keypoint net observer time = {}".format(ob_keypoint.average_time()))
             logging.warning("keypoint net observer time = {}".format(ob_keypoint.average_time_children()))
-        extend_results(i, all_boxes, cls_boxes_i)
+        extend_results(i, all_boxes, cls_boxes_i[0])
         if cls_segms_i is not None:
-            extend_results(i, all_segms, cls_segms_i)
+            extend_results(i, all_segms, cls_segms_i[0])
         if cls_keyps_i is not None:
-            extend_results(i, all_keyps, cls_keyps_i)
+            extend_results(i, all_keyps, cls_keyps_i[0])
 
         if i % 10 == 0:  # Reduce log file size
             ave_total_time = np.sum([t.average_time for t in timers.values()])
@@ -305,9 +306,9 @@ def test_net(
                 im[:, :, ::-1],
                 '{:d}_{:s}'.format(i, im_name),
                 os.path.join(output_dir, 'vis'),
-                cls_boxes_i,
-                segms=cls_segms_i,
-                keypoints=cls_keyps_i,
+                cls_boxes_i[0],
+                segms=cls_segms_i[0],
+                keypoints=cls_keyps_i[0],
                 thresh=cfg.VIS_TH,
                 box_alpha=0.8,
                 dataset=dataset,
