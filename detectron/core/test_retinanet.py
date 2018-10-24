@@ -25,7 +25,7 @@ import logging
 import os
 from collections import defaultdict
 
-from caffe2.python import core, workspace
+from caffe2.python import core, workspace, stat
 
 from detectron.core.config import cfg
 from detectron.modeling.generate_anchors import generate_anchors
@@ -90,7 +90,10 @@ def im_detect_bbox(model, im, timers=None):
     if os.environ.get('EPOCH2')=="1":
         workspace.RunNet(model.net.Proto().name)
     timers['run'].tic()
-    workspace.RunNet(model.net.Proto().name)
+    if os.environ.get('INT8INFO')=="1":
+        stat.GatherStatInfo(workspace, model.net.Proto())
+    else:
+        workspace.RunNet(model.net.Proto().name)
     timers['run'].toc()
     cls_probs = workspace.FetchBlobs(cls_probs)
     box_preds = workspace.FetchBlobs(box_preds)

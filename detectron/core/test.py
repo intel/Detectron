@@ -134,7 +134,10 @@ def im_conv_body_only(model, im, target_scale, target_max_size):
         im, target_scale, target_max_size
     )
     workspace.FeedBlob(core.ScopedName('data'), im_blob)
-    workspace.RunNet(model.conv_body_net.Proto().name)
+    if os.environ.get('INT8INFO')=="1":
+        stat.GatherStatInfo(workspace, model.conv_body_net.Proto())
+    else:
+        workspace.RunNet(model.conv_body_net.Proto().name)
     return im_scale
 
 
@@ -183,7 +186,10 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, boxes=
     if os.environ.get('EPOCH2')=="1":
         workspace.RunNet(model.net.Proto().name)
     timers['run'].tic()
-    workspace.RunNet(model.net.Proto().name)
+    if os.environ.get('INT8INFO')=="1":
+        stat.GatherStatInfo(workspace, model.net.Proto())
+    else:
+        workspace.RunNet(model.net.Proto().name)
     timers['run'].toc()
     timers['result'].tic()
     # Read out blobs
@@ -437,7 +443,10 @@ def im_detect_mask(model, im_scale, boxes, timers=None):
     if os.environ.get('EPOCH2')=="1":
         workspace.RunNet(model.mask_net.Proto().name)
     timers['run_mask'].tic()
-    workspace.RunNet(model.mask_net.Proto().name)
+    if os.environ.get('INT8INFO')=="1":
+        stat.GatherStatInfo(workspace, model.mask_net.Proto())
+    else:
+        workspace.RunNet(model.mask_net.Proto().name)
     timers['run_mask'].toc()
     timers['result_mask'].tic()
     # Fetch masks
@@ -607,7 +616,10 @@ def im_detect_keypoints(model, im_scale, boxes):
 
     for k, v in inputs.items():
         workspace.FeedBlob(core.ScopedName(k), v)
-    workspace.RunNet(model.keypoint_net.Proto().name)
+    if os.environ.get('INT8INFO')=="1":
+        stat.GatherStatInfo(workspace, model.keypoint_net.Proto())
+    else:
+        workspace.RunNet(model.keypoint_net.Proto().name)
 
     pred_heatmaps = workspace.FetchBlob(core.ScopedName('kps_score')).squeeze()
 

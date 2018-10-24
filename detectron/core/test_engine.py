@@ -323,7 +323,22 @@ def test_net(
         model.mask_net.RemoveObserver(ob_mask)
     if ob_keypoint != None:
         model.keypoint_net.RemoveObserver(ob_keypoint)
-    
+    if os.environ.get('INT8INFO')=="1":
+        def save_net_as_pb(net_def):
+            if net_def is None:
+                return
+            if net_def.name is None:
+                return
+            with open(net_def.name + '_int8.pb', 'wb') as n:
+                n.write(net_def.SerializeToString())
+        if model.net:
+            save_net_as_pb(model.net.Proto())
+        if model.conv_body_net:
+            save_net_as_pb(model.conv_body_net.Proto())
+        if cfg.MODEL.MASK_ON:
+            save_net_as_pb(model.mask_net.Proto())
+        if cfg.MODEL.KEYPOINTS_ON:
+            save_net_as_pb(model.keypoint_net.Proto())
     cfg_yaml = yaml.dump(cfg)
     if ind_range is not None:
         det_name = 'detection_range_%s_%s.pkl' % tuple(ind_range)
@@ -354,27 +369,31 @@ def initialize_model_from_cfg(weights_file, gpu_id=0):
     ob_mask=None
     ob_keypoint=None
     model_builder.add_inference_inputs(model)
-    if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
-        logging.warning('optimize....................')
-        tf.optimizeForIDEEP(model.net)
-    workspace.CreateNet(model.net)
+    int8_path = os.environ.get('INT8PATH')
+    def CreateNet(net):
+        if int8_path is not None:
+            int8_file = int8_path + '/' + net.Proto().name + '_int8.pb'
+        if os.path.isfile(int8_file):
+            from caffe2.proto import caffe2_pb2
+            with open(int8_file) as p:
+                net_def = caffe2_pb2.NetDef()
+                net_def.ParseFromString(p.read())
+                net.Proto().CopyFrom(net_def)
+        if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
+            logging.warning('optimize....................')
+            tf.optimizeForIDEEP(net)
+        workspace.CreateNet(net)
+    CreateNet(model.net)
     if os.environ.get('DPROFILE')=="1":
         logging.warning('need profile, add observer....................')
         ob = model.net.AddObserver("TimeObserver")
-    workspace.CreateNet(model.conv_body_net)
+    CreateNet(model.conv_body_net)
     if cfg.MODEL.MASK_ON:
-        if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
-            logging.warning('optimize....................')
-            tf.optimizeForIDEEP(model.mask_net) 
-        workspace.CreateNet(model.mask_net)
+        CreateNet(model.mask_net)
         if os.environ.get('DPROFILE')=="1":
             ob_mask = model.mask_net.AddObserver("TimeObserver")
-
     if cfg.MODEL.KEYPOINTS_ON:
-        if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
-            logging.warning('optimize....................')
-            tf.optimizeForIDEEP(model.keypoint_net)
-        workspace.CreateNet(model.keypoint_net)
+        CreateNet(model.keypoint_net)
         if os.environ.get('DPROFILE')=="1":
             ob_keypoint = model.keypoint_net.AddObserver("TimeObserver")
     return model, ob, ob_mask, ob_keypoint

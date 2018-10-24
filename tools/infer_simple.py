@@ -205,6 +205,23 @@ def main(args):
                 out_when_no_box=args.out_when_no_box
             )
 
+    if os.environ.get('INT8INFO')=="1":
+        def save_net_as_pb(net_def):
+            if net_def is None:
+                return
+            if net_def.name is None:
+                return
+            with open(net_def.name + '_int8.pb', 'wb') as n:
+                n.write(net_def.SerializeToString())
+        if model.net:
+            save_net_as_pb(model.net.Proto())
+        if model.conv_body_net:
+            save_net_as_pb(model.conv_body_net.Proto())
+        if cfg.MODEL.MASK_ON:
+            save_net_as_pb(model.mask_net.Proto())
+        if cfg.MODEL.KEYPOINTS_ON:
+            save_net_as_pb(model.keypoint_net.Proto())
+
 if __name__ == '__main__':
     workspace.GlobalInit(['caffe2', '--caffe2_log_level=0'])
     setup_logging(__name__)
