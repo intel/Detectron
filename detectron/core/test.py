@@ -35,7 +35,7 @@ import logging
 import numpy as np
 
 from caffe2.python import core
-from caffe2.python import workspace
+from caffe2.python import workspace, stat
 import pycocotools.mask as mask_util
 
 from detectron.core.config import cfg
