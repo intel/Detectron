@@ -76,7 +76,8 @@ def add_stage(
     #        "res3" : [1, 1, 1, 1],
     #        "res4" : [1, 1, 1, 1, 1, 1],
     #        "res5" : [1, 1, 1]}
-    if os.environ.get('CONV_ALGORITHM') is None:
+    group=cfg.RESNETS.NUM_GROUPS
+    if os.environ.get('CONV_ALGORITHM') is None or group > 1:
         algorithm = 0
     else:
         algorithm = int(os.environ.get('CONV_ALGORITHM'))
