@@ -333,8 +333,6 @@ def test_net(
                 n.write(net_def.SerializeToString())
         if model.net:
             save_net_as_pb(model.net.Proto())
-        if model.conv_body_net:
-            save_net_as_pb(model.conv_body_net.Proto())
         if cfg.MODEL.MASK_ON:
             save_net_as_pb(model.mask_net.Proto())
         if cfg.MODEL.KEYPOINTS_ON:
@@ -388,7 +386,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0):
     if os.environ.get('DPROFILE')=="1":
         logging.warning('need profile, add observer....................')
         ob = model.net.AddObserver("TimeObserver")
-    CreateNet(model.conv_body_net)
+    workspace.CreateNet(model.conv_body_net)
     if cfg.MODEL.MASK_ON:
         CreateNet(model.mask_net)
         if os.environ.get('DPROFILE')=="1":

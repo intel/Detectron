@@ -215,8 +215,6 @@ def main(args):
                 n.write(net_def.SerializeToString())
         if model.net:
             save_net_as_pb(model.net.Proto())
-        if model.conv_body_net:
-            save_net_as_pb(model.conv_body_net.Proto())
         if cfg.MODEL.MASK_ON:
             save_net_as_pb(model.mask_net.Proto())
         if cfg.MODEL.KEYPOINTS_ON:
