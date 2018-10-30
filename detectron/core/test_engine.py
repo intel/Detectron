@@ -371,9 +371,10 @@ def initialize_model_from_cfg(weights_file, gpu_id=0):
     model_builder.add_inference_inputs(model)
     int8_path = os.environ.get('INT8PATH')
     def CreateNet(net):
+        int8_file=''
         if int8_path is not None:
             int8_file = int8_path + '/' + net.Proto().name + '_int8.pb'
-        if os.path.isfile(int8_file):
+        if int8_file!='' and os.path.isfile(int8_file):
             from caffe2.proto import caffe2_pb2
             with open(int8_file) as p:
                 net_def = caffe2_pb2.NetDef()
