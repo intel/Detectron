@@ -86,6 +86,7 @@ def im_detect_all(model, im, box_proposals, timers=None):
         if i == 0:
             batch_scores = per_image_scores
             batch_boxes = per_image_boxes
+            batch_cls_boxes = per_image_cls_boxes
         else:
             batch_scores = np.hstack((batch_scores, per_image_scores))
             batch_boxes = np.vstack((batch_boxes, per_image_boxes))
