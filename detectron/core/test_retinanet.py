@@ -52,6 +52,7 @@ def assert_allclose(x, y, atol=1e-5, rtol=1e-4, verbose=True):
         #logging.warning("int8_outputis {} and fp32 output is {} ".format(x, y))
         np.testing.assert_allclose(
             x, y, atol=atol, rtol=rtol, verbose=verbose)
+        return True
     except AssertionError as e:
         f = six.StringIO()
         f.write(str(e) + '\n\n')
@@ -76,7 +77,9 @@ def assert_allclose(x, y, atol=1e-5, rtol=1e-4, verbose=True):
             f.write('y: ' + np.array2string(y, prefix='y: ') + '\n')
         finally:
             np.set_printoptions(**opts)
-            raise AssertionError(f.getvalue())
+            logging.warning(f.getvalue())
+            #raise AssertionError(f.getvalue())
+            return False
 
 
 def _create_cell_anchors():
@@ -182,14 +185,18 @@ def im_detect_bbox(model, im, timers=None, model1=None):
                 for k in range(len(int8_inputs)):
                     if model.net.Proto().op[i].input[k][0] == '_':
                         continue
-                    assert_allclose(int8_inputs[k], fp32_inputs[k], **tol)
+                    #assert_allclose(int8_inputs[k], fp32_inputs[k], **tol)
                 logging.warning("pass checking op[{0}] {1} input".format(i,model.net.Proto().op[i].type))
                 logging.warning("begin to check op[{0}] {1} output".format(i,model.net.Proto().op[i].type))
                 for j in range(len(int8_results)):
                     if model.net.Proto().op[i].output[j][0] == '_':
                         continue
                     #logging.warning("int8_outputis {} and fp32 output is {} ".format(int8_results[j], fp32_results[j]))
-                    assert_allclose(int8_results[j], fp32_results[j], **tol)
+                    if not assert_allclose(int8_results[j], fp32_results[j], **tol):
+                        for k in range(len(int8_inputs)):
+                            logging.warning("int8_input[{}] is {}".format(k, int8_inputs[k]))
+                            logging.warning("fp32_input[{}] is {}".format(k, fp32_inputs[k]))
+                            
                 logging.warning("pass checking op[{0}] {1} output".format(i, model.net.Proto().op[i].type))
         else:
             workspace.RunNet(model.net.Proto().name)
