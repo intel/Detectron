@@ -144,8 +144,16 @@ def main(args):
         'RPN models are not supported'
     assert not cfg.TEST.PRECOMPUTED_PROPOSALS, \
         'Models that require precomputed proposals are not supported'
-
+    fp32_ws_name = "__fp32_ws__"
+    int8_ws_name = "__int8_ws__"
+    model1=None
+    if os.environ.get('COSIM')=="1":
+        workspace.SwitchWorkspace(int8_ws_name, True)
     model,_,_,_ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id = args.device_id)
+    if os.environ.get('COSIM')=="1":
+        workspace.SwitchWorkspace(fp32_ws_name, True)
+        model1,_,_,_ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id = args.device_id, int8=False)
+
     dummy_coco_dataset = dummy_datasets.get_coco_dataset()
 
     if os.path.isdir(args.im_or_folder):
@@ -164,7 +172,7 @@ def main(args):
         t = time.time()
         with c2_utils.NamedCudaScope(args.device_id):
             cls_boxes, cls_segms, cls_keyps = infer_engine.im_detect_all(
-                model, im, None, timers=timers
+                model, im, None, timers, model1
             )
         logger.info('Inference time: {:.3f}s'.format(time.time() - t))
         for k, v in timers.items():
