@@ -33,7 +33,7 @@ import cv2
 import os
 import logging
 import numpy as np
-
+import six
 from caffe2.python import core
 from caffe2.python import workspace, stat
 import pycocotools.mask as mask_util
@@ -49,14 +49,57 @@ import detectron.utils.keypoints as keypoint_utils
 
 logger = logging.getLogger(__name__)
 
+def assert_allclose(x, y, atol=1e-5, rtol=1e-4, verbose=True):
+    """Asserts if some corresponding element of x and y differs too much.
 
-def im_detect_all(model, im, box_proposals, timers=None):
+    This function can handle both CPU and GPU arrays simultaneously.
+
+    Args:
+        x: Left-hand-side array.
+        y: Right-hand-side array.
+        atol (float): Absolute tolerance.
+        rtol (float): Relative tolerance.
+        verbose (bool): If ``True``, it outputs verbose messages on error.
+
+    """
+    try:
+        #logging.warning("int8_outputis {} and fp32 output is {} ".format(x, y))
+        np.testing.assert_allclose(
+            x, y, atol=atol, rtol=rtol, verbose=verbose)
+    except AssertionError as e:
+        f = six.StringIO()
+        f.write(str(e) + '\n\n')
+        f.write(
+            'assert_allclose failed: \n' +
+            '  shape: {} {}\n'.format(x.shape, y.shape) +
+            '  dtype: {} {}\n'.format(x.dtype, y.dtype))
+        if x.shape == y.shape:
+            xx = x if x.ndim != 0 else x.reshape((1,))
+            yy = y if y.ndim != 0 else y.reshape((1,))
+            err = np.abs(xx - yy)
+            i = np.unravel_index(np.argmax(err), err.shape)
+            f.write(
+                '  i: {}\n'.format(i) +
+                '  x[i]: {}\n'.format(xx[i]) +
+                '  y[i]: {}\n'.format(yy[i]) +
+                '  err[i]: {}\n'.format(err[i]))
+        opts = np.get_printoptions()
+        try:
+            np.set_printoptions(threshold=10000)
+            f.write('x: ' + np.array2string(x, prefix='x: ') + '\n')
+            f.write('y: ' + np.array2string(y, prefix='y: ') + '\n')
+        finally:
+            np.set_printoptions(**opts)
+            raise AssertionError(f.getvalue())
+
+
+def im_detect_all(model, im, box_proposals, timers=None, model1=None):
     if timers is None:
         timers = defaultdict(Timer)
 
     # Handle RetinaNet testing separately for now
     if cfg.RETINANET.RETINANET_ON:
-        cls_boxes = test_retinanet.im_detect_bbox(model, im, timers)
+        cls_boxes = test_retinanet.im_detect_bbox(model, im, timers, model1)
         return cls_boxes, None, None
 
     timers['im_detect_bbox'].tic()
@@ -65,7 +108,7 @@ def im_detect_all(model, im, box_proposals, timers=None):
         scores, boxes, im_scale = im_detect_bbox_aug(model, im, box_proposals)
     else:
         scores, boxes, im_scale, batch_indices = im_detect_bbox(
-            model, im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, timers, boxes=box_proposals
+            model, im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, timers, model1, boxes=box_proposals
         )
     timers['im_detect_bbox'].toc()
     # score and boxes are from the whole image after score thresholding and nms
@@ -142,7 +185,7 @@ def im_conv_body_only(model, im, target_scale, target_max_size):
     return im_scale
 
 
-def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, boxes=None):
+def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, model1=None, boxes=None):
     """Bounding box object detection for an image with given box proposals.
 
     Arguments:
@@ -160,6 +203,12 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, boxes=
     """
     if timers is None:
         timers = defaultdict(Timer)
+    
+    if model1 is None and os.environ.get('COSIM')=="1":
+        print("cosim must has model1")
+
+    fp32_ws_name = "__fp32_ws__"
+    int8_ws_name = "__int8_ws__"
 
     timers['data1'].tic()
     inputs, im_scale = _get_blobs(im, boxes, target_scale, target_max_size)
@@ -181,7 +230,12 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, boxes=
     if cfg.FPN.MULTILEVEL_ROIS and not cfg.MODEL.FASTER_RCNN:
         _add_multilevel_rois_for_test(inputs, 'rois')
     for k, v in inputs.items():
+        if os.environ.get('COSIM')=="1":
+            workspace.SwitchWorkspace(int8_ws_name, True)
         workspace.FeedBlob(core.ScopedName(k), v)
+        if os.environ.get('COSIM')=="1":
+            workspace.SwitchWorkspace(fp32_ws_name, True)
+            workspace.FeedBlob(core.ScopedName(k), v)
     timers['data1'].toc()
     # run first time to warm up
     if os.environ.get('EPOCH2')=="1":
@@ -190,7 +244,52 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, boxes=
     if os.environ.get('INT8INFO')=="1":
         stat.GatherStatInfo(workspace, model.net.Proto())
     else:
-        workspace.RunNet(model.net.Proto().name)
+        if os.environ.get('COSIM')=="1":
+            with open("int8.txt", "wb") as p:
+                p.write(str(model.net.Proto()))
+            with open("fp32.txt", "wb") as p:
+                p.write(str(model1.net.Proto()))
+            for i in range(len(model.net.Proto().op)):
+                workspace.SwitchWorkspace(int8_ws_name)
+                int8_inputs = []
+                for inp in model.net.Proto().op[i].input:
+                    int8_inputs.append(workspace.FetchBlob(str(inp)))
+                logging.warning(" opint8[{0}] is  {1}".format(i,model.net.Proto().op[i]))
+                workspace.RunOperatorOnce(model.net.Proto().op[i])
+                int8_results = []
+                for res in model.net.Proto().op[i].output:
+                    int8_results.append(workspace.FetchBlob(str(res)))
+                workspace.SwitchWorkspace(fp32_ws_name)
+                fp32_inputs = []
+                for inp1 in model1.net.Proto().op[i].input:
+                    fp32_inputs.append(workspace.FetchBlob(str(inp1)))
+                logging.warning(" opfp32[{0}] is  {1}".format(i,model1.net.Proto().op[i]))
+                workspace.RunOperatorOnce(model1.net.Proto().op[i])
+                fp32_results = []
+                for res1 in model1.net.Proto().op[i].output:
+                    fp32_results.append(workspace.FetchBlob(str(res1)))
+                if len(int8_inputs) != len(fp32_inputs):
+                    logging.error("Wrong number of inputs")
+                    return
+                if len(int8_results) != len(fp32_results):
+                    logging.error("Wrong number of outputs")
+                    return
+                tol = {'atol': 1e-02, 'rtol': 1e-03}
+                logging.warning("begin to check op[{}] {} input".format(i,model.net.Proto().op[i].type))
+                for k in range(len(int8_inputs)):
+                    if model.net.Proto().op[i].input[k][0] == '_':
+                        continue
+                    assert_allclose(int8_inputs[k], fp32_inputs[k], **tol)
+                logging.warning("pass checking op[{0}] {1} input".format(i,model.net.Proto().op[i].type))
+                logging.warning("begin to check op[{0}] {1} output".format(i,model.net.Proto().op[i].type))
+                for j in range(len(int8_results)):
+                    if model.net.Proto().op[i].output[j][0] == '_':
+                        continue
+                    #logging.warning("int8_outputis {} and fp32 output is {} ".format(int8_results[j], fp32_results[j]))
+                    assert_allclose(int8_results[j], fp32_results[j], **tol)
+                logging.warning("pass checking op[{0}] {1} output".format(i, model.net.Proto().op[i].type))
+        else:
+            workspace.RunNet(model.net.Proto().name)
     timers['run'].toc()
     timers['result'].tic()
     # Read out blobs

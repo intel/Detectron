@@ -32,8 +32,51 @@ from detectron.modeling.generate_anchors import generate_anchors
 from detectron.utils.timer import Timer
 import detectron.utils.blob as blob_utils
 import detectron.utils.boxes as box_utils
-
+import six
 logger = logging.getLogger(__name__)
+
+def assert_allclose(x, y, atol=1e-5, rtol=1e-4, verbose=True):
+    """Asserts if some corresponding element of x and y differs too much.
+
+    This function can handle both CPU and GPU arrays simultaneously.
+
+    Args:
+        x: Left-hand-side array.
+        y: Right-hand-side array.
+        atol (float): Absolute tolerance.
+        rtol (float): Relative tolerance.
+        verbose (bool): If ``True``, it outputs verbose messages on error.
+
+    """
+    try:
+        #logging.warning("int8_outputis {} and fp32 output is {} ".format(x, y))
+        np.testing.assert_allclose(
+            x, y, atol=atol, rtol=rtol, verbose=verbose)
+    except AssertionError as e:
+        f = six.StringIO()
+        f.write(str(e) + '\n\n')
+        f.write(
+            'assert_allclose failed: \n' +
+            '  shape: {} {}\n'.format(x.shape, y.shape) +
+            '  dtype: {} {}\n'.format(x.dtype, y.dtype))
+        if x.shape == y.shape:
+            xx = x if x.ndim != 0 else x.reshape((1,))
+            yy = y if y.ndim != 0 else y.reshape((1,))
+            err = np.abs(xx - yy)
+            i = np.unravel_index(np.argmax(err), err.shape)
+            f.write(
+                '  i: {}\n'.format(i) +
+                '  x[i]: {}\n'.format(xx[i]) +
+                '  y[i]: {}\n'.format(yy[i]) +
+                '  err[i]: {}\n'.format(err[i]))
+        opts = np.get_printoptions()
+        try:
+            np.set_printoptions(threshold=10000)
+            f.write('x: ' + np.array2string(x, prefix='x: ') + '\n')
+            f.write('y: ' + np.array2string(y, prefix='y: ') + '\n')
+        finally:
+            np.set_printoptions(**opts)
+            raise AssertionError(f.getvalue())
 
 
 def _create_cell_anchors():
@@ -65,10 +108,16 @@ def _create_cell_anchors():
     return anchors
 
 
-def im_detect_bbox(model, im, timers=None):
+def im_detect_bbox(model, im, timers=None, model1=None):
     """Generate RetinaNet detections on a single image."""
     if timers is None:
         timers = defaultdict(Timer)
+  
+    if model1 is None and os.environ.get('COSIM')=="1":
+        print("cosim must has model1")
+    
+    fp32_ws_name = "__fp32_ws__"
+    int8_ws_name = "__int8_ws__"
     # Although anchors are input independent and could be precomputed,
     # recomputing them per image only brings a small overhead
     anchors = _create_cell_anchors()
@@ -85,7 +134,12 @@ def im_detect_bbox(model, im, timers=None):
         cls_probs.append(core.ScopedName('retnet_cls_prob_{}'.format(suffix)))
         box_preds.append(core.ScopedName('retnet_bbox_pred_{}'.format(suffix)))
     for k, v in inputs.items():
+        if os.environ.get('COSIM')=="1":
+            workspace.SwitchWorkspace(int8_ws_name, True)
         workspace.FeedBlob(core.ScopedName(k), v.astype(np.float32, copy=False))
+        if os.environ.get('COSIM')=="1":
+            workspace.SwitchWorkspace(fp32_ws_name, True)
+            workspace.FeedBlob(core.ScopedName(k), v.astype(np.float32, copy=False))
     timers['data1'].toc()
     if os.environ.get('EPOCH2')=="1":
         workspace.RunNet(model.net.Proto().name)
@@ -93,7 +147,52 @@ def im_detect_bbox(model, im, timers=None):
     if os.environ.get('INT8INFO')=="1":
         stat.GatherStatInfo(workspace, model.net.Proto())
     else:
-        workspace.RunNet(model.net.Proto().name)
+        if os.environ.get('COSIM')=="1":
+            with open("int8.txt", "wb") as p:
+                p.write(str(model.net.Proto()))
+            with open("fp32.txt", "wb") as p:
+                p.write(str(model1.net.Proto()))
+            for i in range(len(model.net.Proto().op)):
+                workspace.SwitchWorkspace(int8_ws_name)
+                int8_inputs = []
+                for inp in model.net.Proto().op[i].input:
+                    int8_inputs.append(workspace.FetchBlob(str(inp)))
+                logging.warning(" opint8[{0}] is  {1}".format(i,model.net.Proto().op[i]))
+                workspace.RunOperatorOnce(model.net.Proto().op[i])
+                int8_results = []
+                for res in model.net.Proto().op[i].output:
+                    int8_results.append(workspace.FetchBlob(str(res)))
+                workspace.SwitchWorkspace(fp32_ws_name)
+                fp32_inputs = []
+                for inp1 in model1.net.Proto().op[i].input:
+                    fp32_inputs.append(workspace.FetchBlob(str(inp1)))
+                logging.warning(" opfp32[{0}] is  {1}".format(i,model1.net.Proto().op[i]))
+                workspace.RunOperatorOnce(model1.net.Proto().op[i])
+                fp32_results = []
+                for res1 in model1.net.Proto().op[i].output:
+                    fp32_results.append(workspace.FetchBlob(str(res1)))
+                if len(int8_inputs) != len(fp32_inputs):
+                    logging.error("Wrong number of inputs")
+                    return
+                if len(int8_results) != len(fp32_results):
+                    logging.error("Wrong number of outputs")
+                    return
+                tol = {'atol': 1e-02, 'rtol': 1e-03}
+                logging.warning("begin to check op[{}] {} input".format(i,model.net.Proto().op[i].type))
+                for k in range(len(int8_inputs)):
+                    if model.net.Proto().op[i].input[k][0] == '_':
+                        continue
+                    assert_allclose(int8_inputs[k], fp32_inputs[k], **tol)
+                logging.warning("pass checking op[{0}] {1} input".format(i,model.net.Proto().op[i].type))
+                logging.warning("begin to check op[{0}] {1} output".format(i,model.net.Proto().op[i].type))
+                for j in range(len(int8_results)):
+                    if model.net.Proto().op[i].output[j][0] == '_':
+                        continue
+                    #logging.warning("int8_outputis {} and fp32 output is {} ".format(int8_results[j], fp32_results[j]))
+                    assert_allclose(int8_results[j], fp32_results[j], **tol)
+                logging.warning("pass checking op[{0}] {1} output".format(i, model.net.Proto().op[i].type))
+        else:
+            workspace.RunNet(model.net.Proto().name)
     timers['run'].toc()
     cls_probs = workspace.FetchBlobs(cls_probs)
     box_preds = workspace.FetchBlobs(box_preds)

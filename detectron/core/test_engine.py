@@ -230,11 +230,18 @@ def test_net(
     """
     assert not cfg.MODEL.RPN_ONLY, \
         'Use rpn_generate to generate proposals from RPN-only models'
-
+    fp32_ws_name = "__fp32_ws__"
+    int8_ws_name = "__int8_ws__"
     roidb, dataset, start_ind, end_ind, total_num_images = get_roidb_and_dataset(
         dataset_name, proposal_file, ind_range
     )
+    model1=None
+    if os.environ.get('COSIM')=="1":
+        workspace.SwitchWorkspace(int8_ws_name, True)
     model, ob, ob_mask, ob_keypoint = initialize_model_from_cfg(weights_file, gpu_id=gpu_id)
+    if os.environ.get('COSIM')=="1":
+        workspace.SwitchWorkspace(fp32_ws_name, True)
+        model1, _,_,_ = initialize_model_from_cfg(weights_file, gpu_id=gpu_id, int8=False)
     num_images = len(roidb)
     num_classes = cfg.MODEL.NUM_CLASSES
     all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
@@ -259,7 +266,7 @@ def test_net(
         print("im is {} and i is {} ".format(entry['image'], i))
         with c2_utils.NamedCudaScope(gpu_id):
             cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(
-                model, im, box_proposals, timers
+                model, im, box_proposals, timers, model1
             )
         if os.environ.get('DPROFILE')=="1" and ob != None:
             logging.warning("enter profile log")
@@ -355,17 +362,17 @@ def test_net(
     return all_boxes, all_segms, all_keyps
 
 
-def initialize_model_from_cfg(weights_file, gpu_id=0):
+def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
     """Initialize a model from the global cfg. Loads test-time weights and
     creates the networks in the Caffe2 workspace.
     """
+    ob=None
+    ob_mask=None
+    ob_keypoint=None
     model = model_builder.create(cfg.MODEL.TYPE, train=False, gpu_id=gpu_id)
     net_utils.initialize_gpu_from_weights_file(
         model, weights_file, gpu_id=gpu_id,
     )
-    ob=None
-    ob_mask=None
-    ob_keypoint=None
     model_builder.add_inference_inputs(model)
     int8_path = os.environ.get('INT8PATH')
     def CreateNet(net):
@@ -382,6 +389,8 @@ def initialize_model_from_cfg(weights_file, gpu_id=0):
             logging.warning('optimize....................')
             tf.optimizeForIDEEP(net)
         workspace.CreateNet(net)
+    if os.environ.get('COSIM')=="1" and int8==False:
+        int8_path=None
     CreateNet(model.net)
     if os.environ.get('DPROFILE')=="1":
         logging.warning('need profile, add observer....................')
