@@ -177,7 +177,7 @@ def im_detect_bbox(model, im, timers=None, model1=None):
                 if len(int8_results) != len(fp32_results):
                     logging.error("Wrong number of outputs")
                     return
-                tol = {'atol': 1e-02, 'rtol': 1e-03}
+                tol = {'atol': 5e-01, 'rtol': 5e-01}
                 logging.warning("begin to check op[{}] {} input".format(i,model.net.Proto().op[i].type))
                 for k in range(len(int8_inputs)):
                     if model.net.Proto().op[i].input[k][0] == '_':
