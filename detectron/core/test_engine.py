@@ -385,7 +385,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
                 net_def = caffe2_pb2.NetDef()
                 net_def.ParseFromString(p.read())
                 net.Proto().CopyFrom(net_def)
-        if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
+        if gpu_id == -2 and os.environ.get('DNOOPT')!="1" and os.environ.get('INT8INFO')!="1":
             logging.warning('optimize....................')
             tf.optimizeForIDEEP(net)
         workspace.CreateNet(net)
