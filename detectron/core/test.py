@@ -107,7 +107,7 @@ def im_detect_all(model, im, box_proposals, timers=None, model1=None):
 
         timers['misc_mask'].tic()
         cls_segms = segm_results(
-            cls_boxes, masks, boxes, im[0].shape[0], im[0].shape[1]
+            cls_boxes, masks, boxes, im[0].shape[0], im[0].shape[1], batch_size
         )
         timers['misc_mask'].toc()
     else:
@@ -924,7 +924,7 @@ def box_results_with_nms_and_limit(scores, boxes):
     return scores, boxes, cls_boxes
 
 
-def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w):
+def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w, bs=1):
     num_classes = cfg.MODEL.NUM_CLASSES
     cls_segms = [[] for _ in range(num_classes)]
     mask_ind = 0
@@ -978,7 +978,7 @@ def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w):
 
         cls_segms[j] = segms
 
-    assert mask_ind == masks.shape[0]
+    assert (mask_ind * bs)  == masks.shape[0]
     return cls_segms
 
 
