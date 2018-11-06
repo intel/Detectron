@@ -32,55 +32,8 @@ from detectron.modeling.generate_anchors import generate_anchors
 from detectron.utils.timer import Timer
 import detectron.utils.blob as blob_utils
 import detectron.utils.boxes as box_utils
-import six
+import detectron.utils.compare as compare_utils
 logger = logging.getLogger(__name__)
-
-def assert_allclose(x, y, atol=1e-5, rtol=1e-4, verbose=True):
-    """Asserts if some corresponding element of x and y differs too much.
-
-    This function can handle both CPU and GPU arrays simultaneously.
-
-    Args:
-        x: Left-hand-side array.
-        y: Right-hand-side array.
-        atol (float): Absolute tolerance.
-        rtol (float): Relative tolerance.
-        verbose (bool): If ``True``, it outputs verbose messages on error.
-
-    """
-    try:
-        #logging.warning("int8_outputis {} and fp32 output is {} ".format(x, y))
-        np.testing.assert_allclose(
-            x, y, atol=atol, rtol=rtol, verbose=verbose)
-        return True
-    except AssertionError as e:
-        f = six.StringIO()
-        f.write(str(e) + '\n\n')
-        f.write(
-            'assert_allclose failed: \n' +
-            '  shape: {} {}\n'.format(x.shape, y.shape) +
-            '  dtype: {} {}\n'.format(x.dtype, y.dtype))
-        if x.shape == y.shape:
-            xx = x if x.ndim != 0 else x.reshape((1,))
-            yy = y if y.ndim != 0 else y.reshape((1,))
-            err = np.abs(xx - yy)
-            i = np.unravel_index(np.argmax(err), err.shape)
-            f.write(
-                '  i: {}\n'.format(i) +
-                '  x[i]: {}\n'.format(xx[i]) +
-                '  y[i]: {}\n'.format(yy[i]) +
-                '  err[i]: {}\n'.format(err[i]))
-        opts = np.get_printoptions()
-        try:
-            np.set_printoptions(threshold=10000)
-            f.write('x: ' + np.array2string(x, prefix='x: ') + '\n')
-            f.write('y: ' + np.array2string(y, prefix='y: ') + '\n')
-        finally:
-            np.set_printoptions(**opts)
-            logging.warning(f.getvalue())
-            #raise AssertionError(f.getvalue())
-            return False
-
 
 def _create_cell_anchors():
     """
@@ -192,7 +145,8 @@ def im_detect_bbox(model, im, timers=None, model1=None):
                     if model.net.Proto().op[i].output[j][0] == '_':
                         continue
                     #logging.warning("int8_outputis {} and fp32 output is {} ".format(int8_results[j], fp32_results[j]))
-                    if not assert_allclose(int8_results[j], fp32_results[j], **tol):
+                    #if not compare_utils.assert_allclose(int8_results[j], fp32_results[j], **tol):
+                    if not compare_utils.assert_compare(int8_results[j], fp32_results[j], 1e-01,'ALL'):   
                         for k in range(len(int8_inputs)):
                             logging.warning("int8_input[{}] is {}".format(k, int8_inputs[k]))
                             logging.warning("fp32_input[{}] is {}".format(k, fp32_inputs[k]))
