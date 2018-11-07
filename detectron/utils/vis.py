@@ -84,7 +84,7 @@ def convert_from_cls_format(cls_boxes, cls_segms, cls_keyps):
         keyps = None
     classes = []
     for j in range(len(cls_boxes)):
-        classes += [j] * len(cls_boxes[j])
+        classes += [ (j % 81) ] * len(cls_boxes[j])
     return boxes, segms, keyps, classes
 
 
