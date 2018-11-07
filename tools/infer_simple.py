@@ -147,10 +147,10 @@ def main(args):
     fp32_ws_name = "__fp32_ws__"
     int8_ws_name = "__int8_ws__"
     model1=None
-    if os.environ.get('COSIM')=="1":
+    if os.environ.get('COSIM')!="":
         workspace.SwitchWorkspace(int8_ws_name, True)
     model,_,_,_ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id = args.device_id)
-    if os.environ.get('COSIM')=="1":
+    if os.environ.get('COSIM')!="":
         workspace.SwitchWorkspace(fp32_ws_name, True)
         model1,_,_,_ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id = args.device_id, int8=False)
 

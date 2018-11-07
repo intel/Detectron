@@ -69,7 +69,7 @@ def im_detect_bbox(model, im, timers=None, model1=None):
     if timers is None:
         timers = defaultdict(Timer)
   
-    if model1 is None and os.environ.get('COSIM')=="1":
+    if model1 is None and os.environ.get('COSIM')!="":
         print("cosim must has model1")
     
     fp32_ws_name = "__fp32_ws__"
@@ -90,10 +90,10 @@ def im_detect_bbox(model, im, timers=None, model1=None):
         cls_probs.append(core.ScopedName('retnet_cls_prob_{}'.format(suffix)))
         box_preds.append(core.ScopedName('retnet_bbox_pred_{}'.format(suffix)))
     for k, v in inputs.items():
-        if os.environ.get('COSIM')=="1":
+        if os.environ.get('COSIM')!="":
             workspace.SwitchWorkspace(int8_ws_name, True)
         workspace.FeedBlob(core.ScopedName(k), v.astype(np.float32, copy=False))
-        if os.environ.get('COSIM')=="1":
+        if os.environ.get('COSIM')!="":
             workspace.SwitchWorkspace(fp32_ws_name, True)
             workspace.FeedBlob(core.ScopedName(k), v.astype(np.float32, copy=False))
     timers['data1'].toc()
@@ -103,7 +103,7 @@ def im_detect_bbox(model, im, timers=None, model1=None):
     if os.environ.get('INT8INFO')=="1":
         stat.GatherStatInfo(workspace, model.net.Proto())
     else:
-        if os.environ.get('COSIM')=="1":
+        if os.environ.get('COSIM')!="":
             with open("int8.txt", "wb") as p:
                 p.write(str(model.net.Proto()))
             with open("fp32.txt", "wb") as p:
@@ -146,7 +146,7 @@ def im_detect_bbox(model, im, timers=None, model1=None):
                         continue
                     #logging.warning("int8_outputis {} and fp32 output is {} ".format(int8_results[j], fp32_results[j]))
                     #if not compare_utils.assert_allclose(int8_results[j], fp32_results[j], **tol):
-                    if not compare_utils.assert_compare(int8_results[j], fp32_results[j], 1e-01,'ALL'):   
+                    if not compare_utils.assert_compare(int8_results[j], fp32_results[j], 1e-01,os.environ.get('COSIM')):   
                         for k in range(len(int8_inputs)):
                             logging.warning("int8_input[{}] is {}".format(k, int8_inputs[k]))
                             logging.warning("fp32_input[{}] is {}".format(k, fp32_inputs[k]))
