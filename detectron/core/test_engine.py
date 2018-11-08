@@ -324,26 +324,30 @@ def test_net(
         for key, value in timers.items():
             logger.info('{} : {}'.format(key, value.average_time))
     #remove observer
-    if ob != None: 
+    if ob != None:
         model.net.RemoveObserver(ob)
     if ob_mask != None:
         model.mask_net.RemoveObserver(ob_mask)
     if ob_keypoint != None:
         model.keypoint_net.RemoveObserver(ob_keypoint)
     if os.environ.get('INT8INFO')=="1":
-        def save_net_as_pb(net_def):
+        def save_net(net_def):
             if net_def is None:
                 return
             if net_def.name is None:
                 return
-            with open(net_def.name + '_int8.pb', 'wb') as n:
-                n.write(net_def.SerializeToString())
+            if os.environ.get('INT8PTXT')=="1":
+                with open(net_def.name + '_int8.ptxt', 'wb') as n:
+                    n.write(str(net_def))
+            else:
+                with open(net_def.name + '_int8.pb', 'wb') as n:
+                    n.write(net_def.SerializeToString())
         if model.net:
-            save_net_as_pb(model.net.Proto())
+            save_net(model.net.Proto())
         if cfg.MODEL.MASK_ON:
-            save_net_as_pb(model.mask_net.Proto())
+            save_net(model.mask_net.Proto())
         if cfg.MODEL.KEYPOINTS_ON:
-            save_net_as_pb(model.keypoint_net.Proto())
+            save_net(model.keypoint_net.Proto())
     cfg_yaml = yaml.dump(cfg)
     if ind_range is not None:
         det_name = 'detection_range_%s_%s.pkl' % tuple(ind_range)
@@ -376,14 +380,20 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
     model_builder.add_inference_inputs(model)
     int8_path = os.environ.get('INT8PATH')
     def CreateNet(net):
-        int8_file=''
-        if int8_path is not None:
-            int8_file = int8_path + '/' + net.Proto().name + '_int8.pb'
-        if int8_file!='' and os.path.isfile(int8_file):
+        int8_file = int8_path if int8_path else ''
+        if os.environ.get('INT8PTXT')=="1":
+            int8_file = int8_file + '/' + net.Proto().name + '_int8.ptxt'
+        else:
+            int8_file = int8_file + '/' + net.Proto().name + '_int8.pb'
+        if os.path.isfile(int8_file):
             from caffe2.proto import caffe2_pb2
             with open(int8_file) as p:
                 net_def = caffe2_pb2.NetDef()
-                net_def.ParseFromString(p.read())
+                if os.environ.get('INT8PTXT')=="1":
+                    import google.protobuf.text_format as ptxt
+                    net_def = ptxt.Parse(p.read(), caffe2_pb2.NetDef())
+                else:
+                    net_def.ParseFromString(p.read())
                 net.Proto().CopyFrom(net_def)
         if gpu_id == -2 and os.environ.get('DNOOPT')!="1" and os.environ.get('INT8INFO')!="1":
             logging.warning('optimize....................')

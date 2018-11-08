@@ -214,19 +214,23 @@ def main(args):
             )
 
     if os.environ.get('INT8INFO')=="1":
-        def save_net_as_pb(net_def):
+        def save_net(net_def):
             if net_def is None:
                 return
             if net_def.name is None:
                 return
-            with open(net_def.name + '_int8.pb', 'wb') as n:
-                n.write(net_def.SerializeToString())
+            if os.environ.get('INT8PTXT')=="1":
+                with open(net_def.name + '_int8.ptxt', 'wb') as n:
+                    n.write(str(net_def))
+            else:
+                with open(net_def.name + '_int8.pb', 'wb') as n:
+                    n.write(net_def.SerializeToString())
         if model.net:
-            save_net_as_pb(model.net.Proto())
+            save_net(model.net.Proto())
         if cfg.MODEL.MASK_ON:
-            save_net_as_pb(model.mask_net.Proto())
+            save_net(model.mask_net.Proto())
         if cfg.MODEL.KEYPOINTS_ON:
-            save_net_as_pb(model.keypoint_net.Proto())
+            save_net(model.keypoint_net.Proto())
 
 if __name__ == '__main__':
     workspace.GlobalInit(['caffe2', '--caffe2_log_level=0'])
