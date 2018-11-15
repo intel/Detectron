@@ -236,10 +236,10 @@ def test_net(
         dataset_name, proposal_file, ind_range
     )
     model1=None
-    if os.environ.get('COSIM')!="":
+    if os.environ.get('COSIM'):
         workspace.SwitchWorkspace(int8_ws_name, True)
     model, ob, ob_mask, ob_keypoint = initialize_model_from_cfg(weights_file, gpu_id=gpu_id)
-    if os.environ.get('COSIM')!="":
+    if os.environ.get('COSIM'):
         workspace.SwitchWorkspace(fp32_ws_name, True)
         model1, _,_,_ = initialize_model_from_cfg(weights_file, gpu_id=gpu_id, int8=False)
     num_images = len(roidb)
@@ -399,7 +399,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
             logging.warning('optimize....................')
             tf.optimizeForIDEEP(net)
         workspace.CreateNet(net)
-    if os.environ.get('COSIM')!="" and int8==False:
+    if os.environ.get('COSIM') and int8==False:
         int8_path=None
     CreateNet(model.net)
     if os.environ.get('DPROFILE')=="1":
