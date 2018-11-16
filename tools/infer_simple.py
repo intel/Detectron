@@ -34,6 +34,7 @@ import sys
 import time
 
 from caffe2.python import workspace
+from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 
 from detectron.core.config import assert_and_infer_cfg
 from detectron.core.config import cfg
@@ -162,6 +163,14 @@ def main(args):
         im_list = [args.im_or_folder]
 
     fnames = batch_image(im_list, args.batch_size)
+    # for kl_divergence calibration, we use the first 100 images to get
+    # the min and max values, and the remaing images are applied to compute the hist.
+    # if the len(images) <= 100, we extend the images with themselves.
+    if os.environ.get('INT8INFO')=="1" and os.environ.get('INT8CALIB')=="kl_divergence":
+        kl_iter_num_for_range = 100
+        while (len(fnames) < 2*kl_iter_num_for_range):
+            fnames += fnames
+
     for i, im_name in enumerate(fnames):
         im = []
         for j, name in enumerate(im_name):
@@ -225,11 +234,24 @@ def main(args):
             else:
                 with open(net_def.name + '_int8.pb', 'wb') as n:
                     n.write(net_def.SerializeToString())
+
+        kind = os.environ.get('INT8CALIB')
+        if kind == "absmax":
+            algorithm = AbsmaxCalib()
+        elif kind == "moving_average":
+            ema_alpha = 0.5
+            algorithm = EMACalib(ema_alpha)
+        elif kind == "kl_divergence":
+            algorithm = KLCalib(kl_iter_num_for_range)
+        calib = Calibrator(algorithm)
         if model.net:
+            calib.GatherResult(model.net.Proto())
             save_net(model.net.Proto())
         if cfg.MODEL.MASK_ON:
+            calib.GatherResult(model.mask_net.Proto())
             save_net(model.mask_net.Proto())
         if cfg.MODEL.KEYPOINTS_ON:
+            calib.GatherResult(model.keypoint_net.Proto())
             save_net(model.keypoint_net.Proto())
 
 if __name__ == '__main__':

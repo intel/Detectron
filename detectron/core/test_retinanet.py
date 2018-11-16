@@ -25,7 +25,8 @@ import logging
 import os
 from collections import defaultdict
 
-from caffe2.python import core, workspace, stat
+from caffe2.python import core, workspace
+from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 
 from detectron.core.config import cfg
 from detectron.modeling.generate_anchors import generate_anchors
@@ -102,6 +103,17 @@ def im_detect_bbox(model, im, timers=None, model1=None):
     timers['run'].tic()
     if os.environ.get('INT8INFO')=="1":
         stat.GatherStatInfo(workspace, model.net.Proto())
+        kind = os.environ.get('INT8CALIB')
+        if kind == "absmax":
+            algorithm = AbsmaxCalib()
+        elif kind == "moving_average":
+            ema_alpha = 0.5
+            algorithm = EMACalib(ema_alpha)
+        elif kind == "kl_divergence":
+            kl_iter_num_for_range = 100
+            algorithm = KLCalib(kl_iter_num_for_range)
+        calib = Calibrator(algorithm)
+        calib.RunCalibIter(workspace, model.net.Proto())
     else:
         if os.environ.get('COSIM'):
             with open("int8.txt", "wb") as p:

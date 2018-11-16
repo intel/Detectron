@@ -35,7 +35,8 @@ import logging
 import numpy as np
 import six
 from caffe2.python import core
-from caffe2.python import workspace, stat
+from caffe2.python import workspace
+from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 import pycocotools.mask as mask_util
 
 from detectron.core.config import cfg
@@ -137,7 +138,17 @@ def im_conv_body_only(model, im, target_scale, target_max_size):
     )
     workspace.FeedBlob(core.ScopedName('data'), im_blob)
     if os.environ.get('INT8INFO')=="1":
-        stat.GatherStatInfo(workspace, model.conv_body_net.Proto())
+        kind = os.environ.get('INT8CALIB')
+        if kind == "absmax":
+            algorithm = AbsmaxCalib()
+        elif kind == "moving_average":
+            ema_alpha = 0.5
+            algorithm = EMACalib(ema_alpha)
+        elif kind == "kl_divergence":
+            kl_iter_num_for_range = 100
+            algorithm = KLCalib(kl_iter_num_for_range)
+        calib = Calibrator(algorithm)
+        calib.RunCalibIter(workspace, model.conv_body_net.Proto())
     else:
         workspace.RunNet(model.conv_body_net.Proto().name)
     return im_scale
@@ -200,7 +211,17 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, model1
         workspace.RunNet(model.net.Proto().name)
     timers['run'].tic()
     if os.environ.get('INT8INFO')=="1":
-        stat.GatherStatInfo(workspace, model.net.Proto())
+        kind = os.environ.get('INT8CALIB')
+        if kind == "absmax":
+            algorithm = AbsmaxCalib()
+        elif kind == "moving_average":
+            ema_alpha = 0.5
+            algorithm = EMACalib(ema_alpha)
+        elif kind == "kl_divergence":
+            kl_iter_num_for_range = 100
+            algorithm = KLCalib(kl_iter_num_for_range)
+        calib = Calibrator(algorithm)
+        calib.RunCalibIter(workspace, model.net.Proto())
     else:
         if os.environ.get('COSIM'):
             cosim_alg = os.environ.get('COSIM')
@@ -508,7 +529,17 @@ def im_detect_mask(model, im_scale, boxes, timers=None):
         workspace.RunNet(model.mask_net.Proto().name)
     timers['run_mask'].tic()
     if os.environ.get('INT8INFO')=="1":
-        stat.GatherStatInfo(workspace, model.mask_net.Proto())
+        kind = os.environ.get('INT8CALIB')
+        if kind == "absmax":
+            algorithm = AbsmaxCalib()
+        elif kind == "moving_average":
+            ema_alpha = 0.5
+            algorithm = EMACalib(ema_alpha)
+        elif kind == "kl_divergence":
+            kl_iter_num_for_range = 100
+            algorithm = KLCalib(kl_iter_num_for_range)
+        calib = Calibrator(algorithm)
+        calib.RunCalibIter(workspace, model.mask_net.Proto())
     else:
         workspace.RunNet(model.mask_net.Proto().name)
     timers['run_mask'].toc()
@@ -681,7 +712,17 @@ def im_detect_keypoints(model, im_scale, boxes):
     for k, v in inputs.items():
         workspace.FeedBlob(core.ScopedName(k), v)
     if os.environ.get('INT8INFO')=="1":
-        stat.GatherStatInfo(workspace, model.keypoint_net.Proto())
+        kind = os.environ.get('INT8CALIB')
+        if kind == "absmax":
+            algorithm = AbsmaxCalib()
+        elif kind == "moving_average":
+            ema_alpha = 0.5
+            algorithm = EMACalib(ema_alpha)
+        elif kind == "kl_divergence":
+            kl_iter_num_for_range = 100
+            algorithm = KLCalib(kl_iter_num_for_range)
+        calib = Calibrator(algorithm)
+        calib.RunCalibIter(workspace, model.keypoint_net.Proto())
     else:
         workspace.RunNet(model.keypoint_net.Proto().name)
 
