@@ -145,7 +145,9 @@ def im_conv_body_only(model, im, target_scale, target_max_size):
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
-            kl_iter_num_for_range = 100
+            kl_iter_num_for_range = int(os.environ.get('INT8KLNUM'))
+            if not kl_iter_num_for_range:
+                kl_iter_num_for_range = 100
             algorithm = KLCalib(kl_iter_num_for_range)
         calib = Calibrator(algorithm)
         calib.RunCalibIter(workspace, model.conv_body_net.Proto())
@@ -218,7 +220,9 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, model1
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
-            kl_iter_num_for_range = 100
+            kl_iter_num_for_range = int(os.environ.get('INT8KLNUM'))
+            if not kl_iter_num_for_range:
+                kl_iter_num_for_range = 100
             algorithm = KLCalib(kl_iter_num_for_range)
         calib = Calibrator(algorithm)
         calib.RunCalibIter(workspace, model.net.Proto())
@@ -536,7 +540,9 @@ def im_detect_mask(model, im_scale, boxes, timers=None):
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
-            kl_iter_num_for_range = 100
+            kl_iter_num_for_range = int(os.environ.get('INT8KLNUM'))
+            if not kl_iter_num_for_range:
+                kl_iter_num_for_range = 100
             algorithm = KLCalib(kl_iter_num_for_range)
         calib = Calibrator(algorithm)
         calib.RunCalibIter(workspace, model.mask_net.Proto())
@@ -719,7 +725,9 @@ def im_detect_keypoints(model, im_scale, boxes):
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
-            kl_iter_num_for_range = 100
+            kl_iter_num_for_range = int(os.environ.get('INT8KLNUM'))
+            if not kl_iter_num_for_range:
+                kl_iter_num_for_range = 100
             algorithm = KLCalib(kl_iter_num_for_range)
         calib = Calibrator(algorithm)
         calib.RunCalibIter(workspace, model.keypoint_net.Proto())

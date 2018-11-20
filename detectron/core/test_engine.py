@@ -253,7 +253,9 @@ def test_net(
     # the min and max values, and the remaing images are applied to compute the hist.
     # if the len(images) <= 100, we extend the images with themselves.
     if os.environ.get('INT8INFO')=="1" and os.environ.get('INT8CALIB')=="kl_divergence":
-        kl_iter_num_for_range = 100
+        kl_iter_num_for_range = int(os.environ.get('INT8KLNUM'))
+        if not kl_iter_num_for_range:
+            kl_iter_num_for_range = 100
         while (len(roidb) < 2*kl_iter_num_for_range):
             roidb += roidb
 
