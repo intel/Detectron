@@ -421,9 +421,18 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
                 else:
                     net_def.ParseFromString(p.read())
                 net.Proto().CopyFrom(net_def)
+        if os.environ.get('DEBUGMODE')=="1":
+            for i, op in enumerate(net.Proto().op):
+                if len(op.name) == 0:
+                    op.name = op.type.lower() + str(i)
         if gpu_id == -2 and os.environ.get('DNOOPT')!="1" and os.environ.get('INT8INFO')!="1":
             logging.warning('optimize....................')
             tf.optimizeForIDEEP(net)
+        if os.environ.get('DEBUGMODE')=="1":
+            with open("{}_opt_predict_net.pb".format(net.Proto().name), "w") as fid:
+                fid.write(net.Proto().SerializeToString())
+            with open("{}_opt_predict_net.pbtxt".format(net.Proto().name), "w") as fid:
+                fid.write(str(net.Proto()))
         workspace.CreateNet(net)
     if os.environ.get('COSIM') and int8==False:
         int8_path=None
