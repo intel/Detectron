@@ -209,7 +209,7 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, model1
             workspace.FeedBlob(core.ScopedName(k), v)
     timers['data1'].toc()
     # run first time to warm up
-    if os.environ.get('EPOCH2')=="1":
+    if os.environ.get('EPOCH2OLD')=="1":
         workspace.RunNet(model.net.Proto().name)
     timers['run'].tic()
     if os.environ.get('INT8INFO')=="1":
@@ -529,7 +529,7 @@ def im_detect_mask(model, im_scale, boxes, timers=None):
         workspace.FeedBlob(core.ScopedName(k), v)
     timers['data_mask'].toc()
     #run first time to warm up
-    if os.environ.get('EPOCH2')=="1":
+    if os.environ.get('EPOCH2OLD')=="1":
         workspace.RunNet(model.mask_net.Proto().name)
     timers['run_mask'].tic()
     if os.environ.get('INT8INFO')=="1":

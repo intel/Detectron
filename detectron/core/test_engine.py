@@ -258,7 +258,36 @@ def test_net(
             kl_iter_num_for_range = 100
         while (len(roidb) < 2*kl_iter_num_for_range):
             roidb += roidb
+    if os.environ.get('EPOCH2')=="1":
+        for i, entry in enumerate(roidb):
+            if cfg.TEST.PRECOMPUTED_PROPOSALS:
+            # The roidb may contain ground-truth rois (for example, if the roidb
+            # comes from the training or val split). We only want to evaluate
+            # detection on the *non*-ground-truth rois. We select only the rois
+            # that have the gt_classes field set to 0, which means there's no
+            # ground truth.
+                box_proposals = entry['boxes'][entry['gt_classes'] == 0]
+                if len(box_proposals) == 0:
+                    continue
+            else:
+            # Faster R-CNN type models generate proposals on-the-fly with an
+            # in-network RPN; 1-stage models don't require proposals.
+                box_proposals = None
 
+            im = []
+            im.append(cv2.imread(entry['image']))
+            print("im is {} and i is {} ".format(entry['image'], i))
+            with c2_utils.NamedCudaScope(gpu_id):
+                cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(
+                    model, im, box_proposals, timers, model1
+                )
+            extend_results(i, all_boxes, cls_boxes_i[0])
+            if cls_segms_i is not None:
+                extend_results(i, all_segms, cls_segms_i[0])
+            if cls_keyps_i is not None:
+                extend_results(i, all_keyps, cls_keyps_i[0])
+            all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
+    logging.warning("begin to run benchmark")
     for i, entry in enumerate(roidb):
         if cfg.TEST.PRECOMPUTED_PROPOSALS:
             # The roidb may contain ground-truth rois (for example, if the roidb
@@ -336,6 +365,12 @@ def test_net(
             )
         for key, value in timers.items():
             logger.info('{} : {}'.format(key, value.average_time))
+
+    if EpochTrue2=1:
+       all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
+       
+
+
     #remove observer
     if ob != None:
         model.net.RemoveObserver(ob)

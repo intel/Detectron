@@ -98,7 +98,7 @@ def im_detect_bbox(model, im, timers=None, model1=None):
             workspace.SwitchWorkspace(fp32_ws_name, True)
             workspace.FeedBlob(core.ScopedName(k), v.astype(np.float32, copy=False))
     timers['data1'].toc()
-    if os.environ.get('EPOCH2')=="1":
+    if os.environ.get('EPOCH2OLD')=="1":
         workspace.RunNet(model.net.Proto().name)
     timers['run'].tic()
     if os.environ.get('INT8INFO')=="1":

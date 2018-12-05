@@ -172,7 +172,20 @@ def main(args):
             kl_iter_num_for_range = 100
         while (len(fnames) < 2*kl_iter_num_for_range):
             fnames += fnames
+    if os.environ.get('EPOCH2')=="1":
+        for i, im_name in enumerate(fnames):
+            im = []
+            for j, name in enumerate(im_name):
+                image = cv2.imread(name)
+                im.append(image)
 
+            timers = defaultdict(Timer)
+            t = time.time()
+            with c2_utils.NamedCudaScope(args.device_id):
+                cls_boxes, cls_segms, cls_keyps = infer_engine.im_detect_all(
+                    model, im, None, timers, model1
+                )
+    logger.warning("begin to run benchmark\n")
     for i, im_name in enumerate(fnames):
         im = []
         for j, name in enumerate(im_name):
