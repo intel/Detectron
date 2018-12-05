@@ -364,11 +364,7 @@ def test_net(
                 show_class=True
             )
         for key, value in timers.items():
-            logger.info('{} : {}'.format(key, value.average_time))
-
-    if EpochTrue2=1:
-       all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
-       
+            logger.info('{} : {}'.format(key, value.average_time))   
 
 
     #remove observer
