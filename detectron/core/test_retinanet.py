@@ -110,9 +110,10 @@ def im_detect_bbox(model, im, timers=None, model1=None):
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
 
-            kl_iter_num_for_range = int(os.environ.get('INT8KLNUM'))
+            kl_iter_num_for_range = os.environ.get('INT8KLNUM')
             if not kl_iter_num_for_range:
                 kl_iter_num_for_range = 100
+            kl_iter_num_for_range = int(kl_iter_num_for_range)
             algorithm = KLCalib(kl_iter_num_for_range)
         calib = Calibrator(algorithm)
         calib.RunCalibIter(workspace, model.net.Proto())
