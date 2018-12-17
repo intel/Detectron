@@ -458,7 +458,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
                     op.name = op.type.lower() + str(i)
         if gpu_id == -2 and os.environ.get('DNOOPT')!="1" and os.environ.get('INT8INFO')!="1":
             logging.warning('optimize....................')
-            tf.optimizeForIDEEP(net)
+            tf.optimizeForMKLDNN(net)
         if os.environ.get('DEBUGMODE')=="1":
             with open("{}_opt_predict_net.pb".format(net.Proto().name), "w") as fid:
                 fid.write(net.Proto().SerializeToString())
