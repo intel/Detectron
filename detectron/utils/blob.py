@@ -37,7 +37,7 @@ from caffe2.proto import caffe2_pb2
 from detectron.core.config import cfg
 
 
-def get_image_blob(im, target_scale, target_max_size):
+def get_image_blob(im, target_scale, target_max_size, size_fix):
     """Convert an image into a network input.
 
     Arguments:
@@ -48,13 +48,15 @@ def get_image_blob(im, target_scale, target_max_size):
         im_scale (float): image scale (target size) / (original size)
         im_info (ndarray)
     """
+    #print("scale={} max={}\n".format(target_scale, target_max_size))
     processed_im = []
     for idx, image in enumerate(im):
+        #print("preimage shape={}\n".format(image.shape))
         processed_image, im_scale = prep_im_for_blob(
-                image, cfg.PIXEL_MEANS, target_scale, target_max_size
+                image, cfg.PIXEL_MEANS, target_scale, target_max_size, size_fix
                 )
         processed_im.append(processed_image)
-
+        #print("afterimage shape={}\n".format(processed_image.shape))
     blob = im_list_to_blob(processed_im)
     # NOTE: this height and width may be larger than actual scaled input image
     # due to the FPN.COARSEST_STRIDE related padding in im_list_to_blob. We are
@@ -64,6 +66,7 @@ def get_image_blob(im, target_scale, target_max_size):
     # because predictions near the edge of the image will be pruned more
     # aggressively).
     height, width = blob.shape[2], blob.shape[3]
+    #print("afterstride  h={} w={}\n".format(height, width)) 
     im_info = np.hstack((height, width, im_scale))[np.newaxis, :]
     return blob, im_scale, im_info.astype(np.float32)
 
@@ -101,7 +104,7 @@ def im_list_to_blob(ims):
     return blob
 
 
-def prep_im_for_blob(im, pixel_means, target_size, max_size):
+def prep_im_for_blob(im, pixel_means, target_size, max_size, size_fix):
     """Prepare an image for use as a network input blob. Specially:
       - Subtract per-channel pixel mean
       - Convert to float32
@@ -114,18 +117,25 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size):
     im_shape = im.shape
     im_size_min = np.min(im_shape[0:2])
     im_size_max = np.max(im_shape[0:2])
-    im_scale = float(target_size) / float(im_size_min)
-    # Prevent the biggest axis from being more than max_size
-    if np.round(im_scale * im_size_max) > max_size:
-        im_scale = float(max_size) / float(im_size_max)
-    im = cv2.resize(
-        im,
-        None,
-        None,
-        fx=im_scale,
-        fy=im_scale,
-        interpolation=cv2.INTER_LINEAR
-    )
+    if size_fix!= True:
+        #print("size_max={} size_min={}\n".format( im_size_min, im_size_max))
+        im_scale = float(target_size) / float(im_size_min)
+        #print("pre im_scale={}\n".format( im_scale))
+        # Prevent the biggest axis from being more than max_size
+        if np.round(im_scale * im_size_max) > max_size:
+            im_scale = float(max_size) / float(im_size_max)
+        #print("after im_scale={}\n".format( im_scale))
+        im = cv2.resize(
+            im,
+            None,
+            None,
+            fx=im_scale,
+            fy=im_scale,
+            interpolation=cv2.INTER_LINEAR
+        )
+    else:
+        im = cv2.resize(im, dsize=(target_size, target_size), interpolation=cv2.INTER_LINEAR) 
+        im_scale = float(target_size) / float(im_size_min)
     return im, im_scale
 
 

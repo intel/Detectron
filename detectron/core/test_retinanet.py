@@ -84,7 +84,7 @@ def im_detect_bbox(model, im, timers=None, model1=None):
     A = cfg.RETINANET.SCALES_PER_OCTAVE * len(cfg.RETINANET.ASPECT_RATIOS)
     inputs = {}
     inputs['data'], im_scale, inputs['im_info'] = \
-        blob_utils.get_image_blob(im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE)
+        blob_utils.get_image_blob(im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, cfg.TEST.SIZEFIX)
     cls_probs, box_preds = [], []
     for lvl in range(k_min, k_max + 1):
         suffix = 'fpn{}'.format(lvl)

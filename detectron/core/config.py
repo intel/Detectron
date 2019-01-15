@@ -232,6 +232,9 @@ __C.TEST.SCALE = 600
 # Max pixel size of the longest side of a scaled input image
 __C.TEST.MAX_SIZE = 1000
 
+# to specify if the size of the input image is fixed
+__C.TEST.SIZEFIX = False
+
 # Overlap threshold used for non-maximum suppression (suppress boxes with
 # IoU >= this threshold)
 __C.TEST.NMS = 0.3

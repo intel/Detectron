@@ -67,7 +67,7 @@ def im_detect_all(model, im, box_proposals, timers=None, model1=None):
         scores, boxes, im_scale = im_detect_bbox_aug(model, im, box_proposals)
     else:
         scores, boxes, im_scale, batch_indices = im_detect_bbox(
-            model, im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, timers, model1, boxes=box_proposals
+            model, im, cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, cfg.TEST.SIZEFIX, timers, model1, boxes=box_proposals
         )
     timers['im_detect_bbox'].toc()
     # score and boxes are from the whole image after score thresholding and nms
@@ -156,7 +156,7 @@ def im_conv_body_only(model, im, target_scale, target_max_size):
     return im_scale
 
 
-def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, model1=None, boxes=None):
+def im_detect_bbox(model, im, target_scale, target_max_size, size_fix, timers=None, model1=None, boxes=None):
     """Bounding box object detection for an image with given box proposals.
 
     Arguments:
@@ -182,7 +182,7 @@ def im_detect_bbox(model, im, target_scale, target_max_size, timers=None, model1
     int8_ws_name = "__int8_ws__"
 
     timers['data1'].tic()
-    inputs, im_scale = _get_blobs(im, boxes, target_scale, target_max_size)
+    inputs, im_scale = _get_blobs(im, boxes, target_scale, target_max_size, size_fix)
 
     # When mapping from image ROIs to feature map ROIs, there's some aliasing
     # (some distinct image ROIs get mapped to the same feature ROI).
@@ -1105,13 +1105,13 @@ def _add_multilevel_rois_for_test(blobs, name):
     )
 
 
-def _get_blobs(im, rois, target_scale, target_max_size):
+def _get_blobs(im, rois, target_scale, target_max_size, size_fix):
     """Convert an image and RoIs within that image into network inputs."""
 
 
     blobs = {}
     blobs['data'], im_scale, blobs['im_info'] = \
-        blob_utils.get_image_blob(im, target_scale, target_max_size)
+        blob_utils.get_image_blob(im, target_scale, target_max_size, size_fix)
     if rois is not None:
         blobs['rois'] = _get_rois_blob(rois, im_scale)
     return blobs, im_scale
