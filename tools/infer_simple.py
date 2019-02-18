@@ -238,36 +238,38 @@ def main(args):
             )
 
     if os.environ.get('INT8INFO')=="1":
-        def save_net(net_def):
-            if net_def is None:
+        def save_net(net_def, init_def):
+            if net_def is None or init_def is None:
                 return
-            if net_def.name is None:
+            if net_def.name is None or init_def.name is None:
                 return
             if os.environ.get('INT8PTXT')=="1":
-                with open(net_def.name + '_int8.ptxt', 'wb') as n:
+                with open(net_def.name + '_predict_int8.ptxt', 'wb') as n:
                     n.write(str(net_def))
+                with open(net_def.name + '_init_int8.ptxt', 'wb') as n:
+                    n.write(str(init_def))
             else:
-                with open(net_def.name + '_int8.pb', 'wb') as n:
+                with open(net_def.name + '_predict_int8.pb', 'wb') as n:
                     n.write(net_def.SerializeToString())
-
+                with open(net_def.name + '_init_int8.pb', 'wb') as n:
+                    n.write(init_def.SerializeToString())
+        algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
-        if kind == "absmax":
-            algorithm = AbsmaxCalib()
-        elif kind == "moving_average":
+        if kind == "moving_average":
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
             algorithm = KLCalib(kl_iter_num_for_range)
         calib = Calibrator(algorithm)
         if model.net:
-            calib.GatherResult(model.net.Proto())
-            save_net(model.net.Proto())
+            predict_quantized, init_quantized = calib.DepositQuantizedModule(workspace, model.net.Proto())
+            save_net(predict_quantized, init_quantized)
         if cfg.MODEL.MASK_ON:
-            calib.GatherResult(model.mask_net.Proto())
-            save_net(model.mask_net.Proto())
+            predict_quantized, init_quantized = calib.DepositQuantizedModule(workspace, model.mask_net.Proto())
+            save_net(predict_quantized, init_quantized)
         if cfg.MODEL.KEYPOINTS_ON:
-            calib.GatherResult(model.keypoint_net.Proto())
-            save_net(model.keypoint_net.Proto())
+            predict_quantized, init_quantized = calib.DepositQuantizedModule(workspace, model.keypoint_net.Proto())
+            save_net(predict_quantized, init_quantized)
 
 if __name__ == '__main__':
     workspace.GlobalInit(['caffe2', '--caffe2_log_level=0'])

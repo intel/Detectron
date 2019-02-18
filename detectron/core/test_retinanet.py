@@ -102,10 +102,9 @@ def im_detect_bbox(model, im, timers=None, model1=None):
         workspace.RunNet(model.net.Proto().name)
     timers['run'].tic()
     if os.environ.get('INT8INFO')=="1":
+        algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
-        if kind == "absmax":
-            algorithm = AbsmaxCalib()
-        elif kind == "moving_average":
+        if kind == "moving_average":
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":

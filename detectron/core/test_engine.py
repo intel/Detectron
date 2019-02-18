@@ -378,7 +378,7 @@ def test_net(
         def save_net(net_def, init_def):
             if net_def is None or init_def is None:
                 return
-            if net_def.name is None or net_def.name is None:
+            if net_def.name is None or init_def.name is None:
                 return
             if os.environ.get('INT8PTXT')=="1":
                 with open(net_def.name + '_predict_int8.ptxt', 'wb') as n:
@@ -390,27 +390,23 @@ def test_net(
                     n.write(net_def.SerializeToString())
                 with open(net_def.name + '_init_int8.pb', 'wb') as n:
                     n.write(init_def.SerializeToString())
-
+        algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
-        if kind == "absmax":
-            algorithm = AbsmaxCalib()
-        elif kind == "moving_average":
+        if kind == "moving_average":
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
             algorithm = KLCalib(kl_iter_num_for_range)
         calib = Calibrator(algorithm)
         if model.net:
-            #calib.GatherResult(model.net.Proto())
             predict_quantized, init_quantized = calib.DepositQuantizedModule(workspace, model.net.Proto())
-            save_net(predict_quantized,init_quantized)
+            save_net(predict_quantized, init_quantized)
         if cfg.MODEL.MASK_ON:
-            #calib.GatherResult(model.mask_net.Proto())
             predict_quantized, init_quantized = calib.DepositQuantizedModule(workspace, model.mask_net.Proto())
-            save_net(predict_quantized,init_quantized)
+            save_net(predict_quantized, init_quantized)
         if cfg.MODEL.KEYPOINTS_ON:
             predict_quantized, init_quantized = calib.DepositQuantizedModule(workspace, model.keypoint_net.Proto())
-            save_net(predict_quantized,init_quantized)
+            save_net(predict_quantized, init_quantized)
     cfg_yaml = yaml.dump(cfg)
     if ind_range is not None:
         det_name = 'detection_range_%s_%s.pkl' % tuple(ind_range)
@@ -442,40 +438,34 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
     )
     model_builder.add_inference_inputs(model)
     int8_path = os.environ.get('INT8PATH')
+    def LoadModuleFile(fname):
+        with open(fname) as f:
+            from caffe2.proto import caffe2_pb2
+            net_def = caffe2_pb2.NetDef()
+            if os.environ.get('INT8PTXT')=="1":
+                import google.protobuf.text_format as ptxt
+                net_def = ptxt.Parse(f.read(), caffe2_pb2.NetDef())
+            else:
+                net_def.ParseFromString(f.read())
+            if gpu_id == -2:
+                device_opts = caffe2_pb2.DeviceOption()
+                device_opts.device_type = caffe2_pb2.IDEEP
+                for op in net_def.op:
+                    op.device_option.CopyFrom(device_opts)
+            return net_def
+        return None
     def CreateNet(net):
         int8_file_path = int8_path if int8_path else ''
         if os.environ.get('INT8PTXT')=="1":
-            int8_file = int8_file_path + '/' + net.Proto().name + '_predict_int8.ptxt'
-            int8_init_file = int8_file_path + '/' + net.Proto().name + '_int8.ptxt'
+            int8_predict_file = int8_file_path + '/' + net.Proto().name + '_predict_int8.ptxt'
+            int8_init_file = int8_file_path + '/' + net.Proto().name + '_init_int8.ptxt'
         else:
-            int8_file = int8_file_path + '/' + net.Proto().name + '_predict_int8.pb'
+            int8_predict_file = int8_file_path + '/' + net.Proto().name + '_predict_int8.pb'
             int8_init_file = int8_file_path + '/' + net.Proto().name + '_init_int8.pb'
-        if os.path.isfile(int8_file):
-            from caffe2.proto import caffe2_pb2
-            with open(int8_init_file) as i:
-                init_def = caffe2_pb2.NetDef()
-                if os.environ.get('INT8PTXT')=="1":
-                    import google.protobuf.text_format as ptxt
-                    init_def = ptxt.Parse(i.read(), caffe2_pb2.NetDef())
-                else:
-                    init_def.ParseFromString(i.read())
-            from caffe2.proto import caffe2_pb2
-            device_opts = caffe2_pb2.DeviceOption()
-            device_opts.device_type = caffe2_pb2.IDEEP
-            def UpdateDeviceOption(dev_opt, net_def):
-                for op in net_def.op:
-                    op.device_option.device_type = dev_opt.device_type
-            UpdateDeviceOption(device_opts, init_def)
-            workspace.RunNetOnce(init_def)
-            with open(int8_file) as p:
-                net_def = caffe2_pb2.NetDef()
-                if os.environ.get('INT8PTXT')=="1":
-                    import google.protobuf.text_format as ptxt
-                    net_def = ptxt.Parse(p.read(), caffe2_pb2.NetDef())
-                else:
-                    net_def.ParseFromString(p.read())
-                UpdateDeviceOption(device_opts, net_def)
-                net.Proto().CopyFrom(net_def)
+        if os.path.isfile(int8_init_file):
+            workspace.RunNetOnce(LoadModuleFile(int8_init_file))
+        if os.path.isfile(int8_predict_file):
+            net.Proto().CopyFrom(LoadModuleFile(int8_predict_file))
         if os.environ.get('DEBUGMODE')=="1":
             for i, op in enumerate(net.Proto().op):
                 if len(op.name) == 0:
