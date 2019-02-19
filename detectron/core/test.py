@@ -138,10 +138,9 @@ def im_conv_body_only(model, im, target_scale, target_max_size):
     )
     workspace.FeedBlob(core.ScopedName('data'), im_blob)
     if os.environ.get('INT8INFO')=="1":
+        algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
-        if kind == "absmax":
-            algorithm = AbsmaxCalib()
-        elif kind == "moving_average":
+        if kind == "moving_average":
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
@@ -213,10 +212,9 @@ def im_detect_bbox(model, im, target_scale, target_max_size, size_fix, timers=No
         workspace.RunNet(model.net.Proto().name)
     timers['run'].tic()
     if os.environ.get('INT8INFO')=="1":
+        algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
-        if kind == "absmax":
-            algorithm = AbsmaxCalib()
-        elif kind == "moving_average":
+        if kind == "moving_average":
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
@@ -534,10 +532,9 @@ def im_detect_mask(model, im_scale, boxes, timers=None):
         workspace.RunNet(model.mask_net.Proto().name)
     timers['run_mask'].tic()
     if os.environ.get('INT8INFO')=="1":
+        algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
-        if kind == "absmax":
-            algorithm = AbsmaxCalib()
-        elif kind == "moving_average":
+        if kind == "moving_average":
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
@@ -719,10 +716,9 @@ def im_detect_keypoints(model, im_scale, boxes):
     for k, v in inputs.items():
         workspace.FeedBlob(core.ScopedName(k), v)
     if os.environ.get('INT8INFO')=="1":
+        algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
-        if kind == "absmax":
-            algorithm = AbsmaxCalib()
-        elif kind == "moving_average":
+        if kind == "moving_average":
             ema_alpha = 0.5
             algorithm = EMACalib(ema_alpha)
         elif kind == "kl_divergence":
