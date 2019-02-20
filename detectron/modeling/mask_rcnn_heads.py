@@ -131,8 +131,8 @@ def mask_rcnn_fcn_head_v1up(model, blob_in, dim_in, spatial_scale):
 
 
 def mask_rcnn_fcn_head_v1upXconvs(
-    model, blob_in, dim_in, spatial_scale, num_convs
-):
+        model, blob_in, dim_in, spatial_scale, num_convs
+    ):
     """v1upXconvs design: X * (conv 3x3), convT 2x2."""
     current = model.RoIFeatureTransform(
         blob_in,
@@ -161,7 +161,7 @@ def mask_rcnn_fcn_head_v1upXconvs(
             stride=1,
             weight_init=(cfg.MRCNN.CONV_INIT, {'std': 0.001}),
             bias_init=('ConstantFill', {'value': 0.}),
-            conv_algorithm = conv3x3_algorithm
+            conv_algorithm=conv3x3_algorithm
         )
         current = model.Relu(current, current)
         dim_in = dim_inner
@@ -184,8 +184,8 @@ def mask_rcnn_fcn_head_v1upXconvs(
 
 
 def mask_rcnn_fcn_head_v1upXconvs_gn(
-    model, blob_in, dim_in, spatial_scale, num_convs
-):
+        model, blob_in, dim_in, spatial_scale, num_convs
+    ):
     """v1upXconvs design: X * (conv 3x3), convT 2x2, with GroupNorm"""
     current = model.RoIFeatureTransform(
         blob_in,

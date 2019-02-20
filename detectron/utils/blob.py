@@ -29,15 +29,15 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import cPickle as pickle
-import cv2
 import numpy as np
+import cv2
 
 from caffe2.proto import caffe2_pb2
 
 from detectron.core.config import cfg
 
 
-def get_image_blob(im, target_scale, target_max_size, size_fix):
+def get_image_blob(im, target_scale, target_max_size, size_fix=None):
     """Convert an image into a network input.
 
     Arguments:
@@ -50,11 +50,11 @@ def get_image_blob(im, target_scale, target_max_size, size_fix):
     """
     #print("scale={} max={}\n".format(target_scale, target_max_size))
     processed_im = []
-    for idx, image in enumerate(im):
+    for _, image in enumerate(im):
         #print("preimage shape={}\n".format(image.shape))
         processed_image, im_scale = prep_im_for_blob(
-                image, cfg.PIXEL_MEANS, target_scale, target_max_size, size_fix
-                )
+            image, cfg.PIXEL_MEANS, target_scale, target_max_size, size_fix
+            )
         processed_im.append(processed_image)
         #print("afterimage shape={}\n".format(processed_image.shape))
     blob = im_list_to_blob(processed_im)
@@ -66,7 +66,6 @@ def get_image_blob(im, target_scale, target_max_size, size_fix):
     # because predictions near the edge of the image will be pruned more
     # aggressively).
     height, width = blob.shape[2], blob.shape[3]
-    #print("afterstride  h={} w={}\n".format(height, width)) 
     im_info = np.hstack((height, width, im_scale))[np.newaxis, :]
     return blob, im_scale, im_info.astype(np.float32)
 
@@ -117,7 +116,7 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size, size_fix):
     im_shape = im.shape
     im_size_min = np.min(im_shape[0:2])
     im_size_max = np.max(im_shape[0:2])
-    if size_fix!= True:
+    if size_fix != True:
         #print("size_max={} size_min={}\n".format( im_size_min, im_size_max))
         im_scale = float(target_size) / float(im_size_min)
         #print("pre im_scale={}\n".format( im_scale))
@@ -134,7 +133,7 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size, size_fix):
             interpolation=cv2.INTER_LINEAR
         )
     else:
-        im = cv2.resize(im, dsize=(target_size, target_size), interpolation=cv2.INTER_LINEAR) 
+        im = cv2.resize(im, dsize=(target_size, target_size), interpolation=cv2.INTER_LINEAR)
         im_scale = float(target_size) / float(im_size_min)
     return im, im_scale
 
@@ -161,7 +160,7 @@ def py_op_copy_blob(blob_in, blob_out):
     # Some awkward voodoo required by Caffe2 to support int32 blobs
     needs_int32_init = False
     try:
-        _ = blob.data.dtype  # noqa
+        _ = blob_in.data.dtype  # noqa
     except Exception:
         needs_int32_init = blob_in.dtype == np.int32
     if needs_int32_init:

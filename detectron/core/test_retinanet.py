@@ -20,10 +20,10 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import numpy as np
 import logging
 import os
 from collections import defaultdict
+import numpy as np
 
 from caffe2.python import core, workspace
 from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
@@ -98,10 +98,10 @@ def im_detect_bbox(model, im, timers=None, model1=None):
             workspace.SwitchWorkspace(fp32_ws_name, True)
             workspace.FeedBlob(core.ScopedName(k), v.astype(np.float32, copy=False))
     timers['data1'].toc()
-    if os.environ.get('EPOCH2OLD')=="1":
+    if os.environ.get('EPOCH2OLD') == "1":
         workspace.RunNet(model.net.Proto().name)
     timers['run'].tic()
-    if os.environ.get('INT8INFO')=="1":
+    if os.environ.get('INT8INFO') == "1":
         algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
         if kind == "moving_average":
@@ -127,7 +127,7 @@ def im_detect_bbox(model, im, timers=None, model1=None):
                 int8_inputs = []
                 for inp in model.net.Proto().op[i].input:
                     int8_inputs.append(workspace.FetchBlob(str(inp)))
-                logging.warning(" opint8[{0}] is  {1}".format(i,model.net.Proto().op[i]))
+                logging.warning(" opint8[{0}] is  {1}".format(i, model.net.Proto().op[i]))
                 workspace.RunOperatorOnce(model.net.Proto().op[i])
                 int8_results = []
                 for res in model.net.Proto().op[i].output:
@@ -136,7 +136,7 @@ def im_detect_bbox(model, im, timers=None, model1=None):
                 fp32_inputs = []
                 for inp1 in model1.net.Proto().op[i].input:
                     fp32_inputs.append(workspace.FetchBlob(str(inp1)))
-                logging.warning(" opfp32[{0}] is  {1}".format(i,model1.net.Proto().op[i]))
+                logging.warning(" opfp32[{0}] is  {1}".format(i, model1.net.Proto().op[i]))
                 workspace.RunOperatorOnce(model1.net.Proto().op[i])
                 fp32_results = []
                 for res1 in model1.net.Proto().op[i].output:
@@ -147,22 +147,22 @@ def im_detect_bbox(model, im, timers=None, model1=None):
                 if len(int8_results) != len(fp32_results):
                     logging.error("Wrong number of outputs")
                     return
-                tol = {'atol': 5e-01, 'rtol': 5e-01}
-                logging.warning("begin to check op[{}] {} input".format(i,model.net.Proto().op[i].type))
+                logging.warning("begin to check op[{}] {} input".format(i, model.net.Proto().op[i].type))
                 for k in range(len(int8_inputs)):
                     if model.net.Proto().op[i].input[k][0] == '_':
                         continue
                     #assert_allclose(int8_inputs[k], fp32_inputs[k], **tol)
-                logging.warning("pass checking op[{0}] {1} input".format(i,model.net.Proto().op[i].type))
-                logging.warning("begin to check op[{0}] {1} output".format(i,model.net.Proto().op[i].type))
-                for j in range(len(int8_results)):
+                logging.warning("pass checking op[{0}] {1} input".format(i, model.net.Proto().op[i].type))
+                logging.warning("begin to check op[{0}] {1} output".format(i, model.net.Proto().op[i].type))
+                for j, int8_result in enumerate(int8_results):
                     if model.net.Proto().op[i].output[j][0] == '_':
                         continue
                     #logging.warning("int8_outputis {} and fp32 output is {} ".format(int8_results[j], fp32_results[j]))
                     #if not compare_utils.assert_allclose(int8_results[j], fp32_results[j], **tol):
-                    if not compare_utils.assert_compare(int8_results[j], fp32_results[j], 1e-01,os.environ.get('COSIM')):
-                        for k in range(len(int8_inputs)):
-                            logging.warning("int8_input[{}] is {}".format(k, int8_inputs[k]))
+                    if not compare_utils.assert_compare(int8_result, fp32_results[j],
+                                                        1e-01, os.environ.get('COSIM')):
+                        for k, int8_input in enumerate(int8_inputs):
+                            logging.warning("int8_input[{}] is {}".format(k, int8_input))
                             logging.warning("fp32_input[{}] is {}".format(k, fp32_inputs[k]))
 
                 logging.warning("pass checking op[{0}] {1} output".format(i, model.net.Proto().op[i].type))
@@ -197,7 +197,7 @@ def im_detect_bbox(model, im, timers=None, model1=None):
             cls_prob = cls_prob[:, :, 1::, :, :]
 
         for i in range(batch_size):
-            cls_prob_ravel = cls_prob[i,:].ravel()
+            cls_prob_ravel = cls_prob[i, :].ravel()
 
             # In some cases [especially for very small img sizes], it's possible that
             # candidate_ind is empty if we impose threshold 0.05 at all levels. This
@@ -210,10 +210,10 @@ def im_detect_bbox(model, im, timers=None, model1=None):
 
             pre_nms_topn = min(cfg.RETINANET.PRE_NMS_TOP_N, len(candidate_inds))
             inds = np.argpartition(
-                    cls_prob_ravel[candidate_inds], -pre_nms_topn)[-pre_nms_topn:]
+                cls_prob_ravel[candidate_inds], -pre_nms_topn)[-pre_nms_topn:]
             inds = candidate_inds[inds]
 
-            inds_4d = np.array(np.unravel_index(inds, (cls_prob[i,:]).shape)).transpose()
+            inds_4d = np.array(np.unravel_index(inds, (cls_prob[i, :]).shape)).transpose()
             classes = inds_4d[:, 1]
             anchor_ids, y, x = inds_4d[:, 0], inds_4d[:, 2], inds_4d[:, 3]
             scores = cls_prob[i, anchor_ids, classes, y, x]
@@ -226,12 +226,12 @@ def im_detect_bbox(model, im, timers=None, model1=None):
             else:
                 box_cls_inds = classes * 4
                 box_deltas = np.vstack(
-                   [box_pred[i, ind:ind + 4, yi, xi]
-                   for ind, yi, xi in zip(box_cls_inds, y, x)]
+                    [box_pred[i, ind:ind + 4, yi, xi]
+                     for ind, yi, xi in zip(box_cls_inds, y, x)]
                 )
             pred_boxes = (
-                    box_utils.bbox_transform(boxes, box_deltas)
-                    if cfg.TEST.BBOX_REG else boxes)
+                box_utils.bbox_transform(boxes, box_deltas)
+                if cfg.TEST.BBOX_REG else boxes)
             pred_boxes /= im_scale
             pred_boxes = box_utils.clip_tiled_boxes(pred_boxes, im[0].shape)
             box_scores = np.zeros((pred_boxes.shape[0], 5))

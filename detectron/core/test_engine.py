@@ -21,12 +21,12 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from collections import defaultdict
-import cv2
 import datetime
 import logging
-import numpy as np
 import os
+import numpy as np
 import yaml
+import cv2
 
 from caffe2.python import workspace
 from caffe2.python import transformations as tf
@@ -52,7 +52,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_eval_functions():
-    # Determine which parent or child function should handle inference
+    """to return the parent and child function handle the inference"""
+    #Determine which parent or child function should handle inference
     if cfg.MODEL.RPN_ONLY:
         child_func = generate_rpn_on_range
         parent_func = generate_rpn_on_dataset
@@ -66,6 +67,7 @@ def get_eval_functions():
 
 
 def get_inference_dataset(index, is_parent=True):
+    """get the dataset of the inference"""
     assert is_parent or len(cfg.TEST.DATASETS) == 1, \
         'The child inference process can only work on a single dataset'
 
@@ -85,10 +87,11 @@ def get_inference_dataset(index, is_parent=True):
 
 
 def run_inference(
-    weights_file, ind_range=None,
-    multi_gpu_testing=False, gpu_id=0,
-    check_expected_results=False,
-):
+        weights_file, ind_range=None,
+        multi_gpu_testing=False, gpu_id=0,
+        check_expected_results=False,
+    ):
+    """to run inference"""
     parent_func, child_func = get_eval_functions()
     is_parent = ind_range is None
 
@@ -141,13 +144,13 @@ def run_inference(
 
 
 def test_net_on_dataset(
-    weights_file,
-    dataset_name,
-    proposal_file,
-    output_dir,
-    multi_gpu=False,
-    gpu_id=0
-):
+        weights_file,
+        dataset_name,
+        proposal_file,
+        output_dir,
+        multi_gpu=False,
+        gpu_id=0
+    ):
     """Run inference on a dataset."""
     dataset = JsonDataset(dataset_name)
     test_timer = Timer()
@@ -170,7 +173,7 @@ def test_net_on_dataset(
 
 
 def multi_gpu_test_net_on_dataset(
-    weights_file, dataset_name, proposal_file, num_images, output_dir
+        weights_file, dataset_name, proposal_file, num_images, output_dir
 ):
     """Multi-gpu inference on a dataset."""
     binary_dir = envu.get_runtime_dir()
@@ -219,13 +222,13 @@ def multi_gpu_test_net_on_dataset(
 
 
 def test_net(
-    weights_file,
-    dataset_name,
-    proposal_file,
-    output_dir,
-    ind_range=None,
-    gpu_id=0
-):
+        weights_file,
+        dataset_name,
+        proposal_file,
+        output_dir,
+        ind_range=None,
+        gpu_id=0
+    ):
     """Run inference on all images in a dataset or over an index range of images
     in a dataset using a single GPU.
     """
@@ -236,29 +239,28 @@ def test_net(
     roidb, dataset, start_ind, end_ind, total_num_images = get_roidb_and_dataset(
         dataset_name, proposal_file, ind_range
     )
-    model1=None
+    model1 = None
     if os.environ.get('COSIM'):
         workspace.SwitchWorkspace(int8_ws_name, True)
     model, ob, ob_mask, ob_keypoint = initialize_model_from_cfg(weights_file, gpu_id=gpu_id)
     if os.environ.get('COSIM'):
         workspace.SwitchWorkspace(fp32_ws_name, True)
-        model1, _,_,_ = initialize_model_from_cfg(weights_file, gpu_id=gpu_id, int8=False)
+        model1, _, _, _ = initialize_model_from_cfg(weights_file, gpu_id=gpu_id, int8=False)
     num_images = len(roidb)
     num_classes = cfg.MODEL.NUM_CLASSES
     all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
     timers = defaultdict(Timer)
 
-    
     # for kl_divergence calibration, we use the first 100 images to get
     # the min and max values, and the remaing images are applied to compute the hist.
     # if the len(images) <= 100, we extend the images with themselves.
-    if os.environ.get('INT8INFO')=="1" and os.environ.get('INT8CALIB')=="kl_divergence":
+    if os.environ.get('INT8INFO') == "1" and os.environ.get('INT8CALIB') == "kl_divergence":
         kl_iter_num_for_range = int(os.environ.get('INT8KLNUM'))
         if not kl_iter_num_for_range:
             kl_iter_num_for_range = 100
         while (len(roidb) < 2*kl_iter_num_for_range):
             roidb += roidb
-    if os.environ.get('EPOCH2')=="1":
+    if os.environ.get('EPOCH2') == "1":
         for i, entry in enumerate(roidb):
             if cfg.TEST.PRECOMPUTED_PROPOSALS:
             # The roidb may contain ground-truth rois (for example, if the roidb
@@ -310,14 +312,14 @@ def test_net(
             cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(
                 model, im, box_proposals, timers, model1
             )
-        if os.environ.get('DPROFILE')=="1" and ob != None:
+        if os.environ.get('DPROFILE') == "1" and ob != None:
             logging.warning("enter profile log")
             logging.warning("net observer time = {}".format(ob.average_time()))
             logging.warning("net observer time = {}".format(ob.average_time_children()))
-        if os.environ.get('DPROFILE')=="1" and ob_mask != None:
+        if os.environ.get('DPROFILE') == "1" and ob_mask != None:
             logging.warning("mask net observer time = {}".format(ob_mask.average_time()))
             logging.warning("mask net observer time = {}".format(ob_mask.average_time_children()))
-        if os.environ.get('DPROFILE')=="1" and ob_mask != None:
+        if os.environ.get('DPROFILE') == "1" and ob_mask != None:
             logging.warning("keypoint net observer time = {}".format(ob_keypoint.average_time()))
             logging.warning("keypoint net observer time = {}".format(ob_keypoint.average_time_children()))
         extend_results(i, all_boxes, cls_boxes_i[0])
@@ -364,7 +366,7 @@ def test_net(
                 show_class=True
             )
         for key, value in timers.items():
-            logger.info('{} : {}'.format(key, value.average_time))   
+            logger.info('{} : {}'.format(key, value.average_time))
 
 
     #remove observer
@@ -374,13 +376,13 @@ def test_net(
         model.mask_net.RemoveObserver(ob_mask)
     if ob_keypoint != None:
         model.keypoint_net.RemoveObserver(ob_keypoint)
-    if os.environ.get('INT8INFO')=="1":
+    if os.environ.get('INT8INFO') == "1":
         def save_net(net_def, init_def):
             if net_def is None or init_def is None:
                 return
             if net_def.name is None or init_def.name is None:
                 return
-            if os.environ.get('INT8PTXT')=="1":
+            if os.environ.get('INT8PTXT') == "1":
                 with open(net_def.name + '_predict_int8.ptxt', 'wb') as n:
                     n.write(str(net_def))
                 with open(net_def.name + '_init_int8.ptxt', 'wb') as n:
@@ -429,9 +431,9 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
     """Initialize a model from the global cfg. Loads test-time weights and
     creates the networks in the Caffe2 workspace.
     """
-    ob=None
-    ob_mask=None
-    ob_keypoint=None
+    ob = None
+    ob_mask = None
+    ob_keypoint = None
     model = model_builder.create(cfg.MODEL.TYPE, train=False, gpu_id=gpu_id)
     net_utils.initialize_gpu_from_weights_file(
         model, weights_file, gpu_id=gpu_id,
@@ -442,7 +444,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
         with open(fname) as f:
             from caffe2.proto import caffe2_pb2
             net_def = caffe2_pb2.NetDef()
-            if os.environ.get('INT8PTXT')=="1":
+            if os.environ.get('INT8PTXT') == "1":
                 import google.protobuf.text_format as ptxt
                 net_def = ptxt.Parse(f.read(), caffe2_pb2.NetDef())
             else:
@@ -456,7 +458,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
         return None
     def CreateNet(net):
         int8_file_path = int8_path if int8_path else ''
-        if os.environ.get('INT8PTXT')=="1":
+        if os.environ.get('INT8PTXT') == "1":
             int8_predict_file = int8_file_path + '/' + net.Proto().name + '_predict_int8.ptxt'
             int8_init_file = int8_file_path + '/' + net.Proto().name + '_init_int8.ptxt'
         else:
@@ -466,33 +468,33 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
             workspace.RunNetOnce(LoadModuleFile(int8_init_file))
         if os.path.isfile(int8_predict_file):
             net.Proto().CopyFrom(LoadModuleFile(int8_predict_file))
-        if os.environ.get('DEBUGMODE')=="1":
+        if os.environ.get('DEBUGMODE') == "1":
             for i, op in enumerate(net.Proto().op):
                 if len(op.name) == 0:
                     op.name = op.type.lower() + str(i)
-        if gpu_id == -2 and os.environ.get('DNOOPT')!="1":
+        if gpu_id == -2 and os.environ.get('DNOOPT') != "1":
             logging.warning('optimize....................')
             tf.optimizeForMKLDNN(net)
-        if os.environ.get('DEBUGMODE')=="1":
+        if os.environ.get('DEBUGMODE') == "1":
             with open("{}_opt_predict_net.pb".format(net.Proto().name), "w") as fid:
                 fid.write(net.Proto().SerializeToString())
             with open("{}_opt_predict_net.pbtxt".format(net.Proto().name), "w") as fid:
                 fid.write(str(net.Proto()))
         workspace.CreateNet(net)
-    if os.environ.get('COSIM') and int8==False:
-        int8_path=None
+    if os.environ.get('COSIM') and int8 == False:
+        int8_path = None
     CreateNet(model.net)
-    if os.environ.get('DPROFILE')=="1":
+    if os.environ.get('DPROFILE') == "1":
         logging.warning('need profile, add observer....................')
         ob = model.net.AddObserver("TimeObserver")
     workspace.CreateNet(model.conv_body_net)
     if cfg.MODEL.MASK_ON:
         CreateNet(model.mask_net)
-        if os.environ.get('DPROFILE')=="1":
+        if os.environ.get('DPROFILE') == "1":
             ob_mask = model.mask_net.AddObserver("TimeObserver")
     if cfg.MODEL.KEYPOINTS_ON:
         CreateNet(model.keypoint_net)
-        if os.environ.get('DPROFILE')=="1":
+        if os.environ.get('DPROFILE') == "1":
             ob_keypoint = model.keypoint_net.AddObserver("TimeObserver")
     return model, ob, ob_mask, ob_keypoint
 

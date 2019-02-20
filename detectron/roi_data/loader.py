@@ -43,12 +43,12 @@ from __future__ import unicode_literals
 from collections import deque
 from collections import OrderedDict
 import logging
-import numpy as np
 import Queue
 import signal
 import threading
 import time
 import uuid
+import numpy as np
 
 from caffe2.python import core, workspace
 
@@ -64,13 +64,14 @@ logger = logging.getLogger(__name__)
 
 
 class RoIDataLoader(object):
+    """roi data loader"""
     def __init__(
-        self,
-        roidb,
-        num_loaders=4,
-        minibatch_queue_size=64,
-        blobs_queue_capacity=8
-    ):
+            self,
+            roidb,
+            num_loaders=4,
+            minibatch_queue_size=64,
+            blobs_queue_capacity=8
+        ):
         self._roidb = roidb
         self._lock = threading.Lock()
         self._perm = deque(range(len(self._roidb)))
@@ -207,8 +208,10 @@ class RoIDataLoader(object):
         )
 
     def create_threads(self):
-        # Create mini-batch loader threads, each of which builds mini-batches
-        # and places them into a queue in CPU memory
+        """
+        Create mini-batch loader threads, each of which builds mini-batches
+        and places them into a queue in CPU memory
+        """
         self._workers = [
             threading.Thread(target=self.minibatch_loader_thread)
             for _ in range(self._num_loaders)
@@ -227,6 +230,7 @@ class RoIDataLoader(object):
         ]
 
     def start(self, prefill=False):
+        """start function"""
         for w in self._workers + self._enqueuers:
             w.start()
         if prefill:
@@ -245,6 +249,7 @@ class RoIDataLoader(object):
                     break
 
     def shutdown(self):
+        """shutdown function"""
         self.coordinator.request_stop()
         self.coordinator.wait_for_stop()
         self.close_blobs_queues()
@@ -289,6 +294,7 @@ class RoIDataLoader(object):
             )
 
     def create_enqueue_blobs(self):
+        """create enqueue blobs"""
         blob_names = self.get_output_names()
         enqueue_blob_names = [
             '{}_enqueue_{}'.format(b, self._loader_id) for b in blob_names

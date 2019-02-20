@@ -94,8 +94,8 @@ def add_fpn_ResNet152_conv5_P2only_body(model):
 # ---------------------------------------------------------------------------- #
 
 def add_fpn_onto_conv_body(
-    model, conv_body_func, fpn_level_info_func, P2only=False
-):
+        model, conv_body_func, fpn_level_info_func, P2only=False
+    ):
     """Add the specified conv body to the model and then add FPN levels to it.
     """
     # Note: blobs_conv is in revsersed order: [fpn5, fpn4, fpn3, fpn2]
@@ -186,7 +186,7 @@ def add_fpn(model, fpn_level_info):
     # Post-hoc scale-specific 3x3 convs
     blobs_fpn = []
     spatial_scales = []
-   
+
     if os.environ.get('CONV_ALGORITHM') is None:
         conv3x3_algorithm = 0
     else:
@@ -206,7 +206,7 @@ def add_fpn(model, fpn_level_info):
                 stride=1,
                 weight_init=xavier_fill,
                 bias_init=const_fill(0.0),
-                conv_algorithm = conv3x3_algorithm
+                conv_algorithm=conv3x3_algorithm
             )
         else:
             fpn_blob = model.Conv(
@@ -219,7 +219,7 @@ def add_fpn(model, fpn_level_info):
                 stride=1,
                 weight_init=xavier_fill,
                 bias_init=const_fill(0.0),
-                conv_algorithm = conv3x3_algorithm
+                conv_algorithm=conv3x3_algorithm
             )
         blobs_fpn += [fpn_blob]
         spatial_scales += [fpn_level_info.spatial_scales[i]]
@@ -265,8 +265,8 @@ def add_fpn(model, fpn_level_info):
 
 
 def add_topdown_lateral_module(
-    model, fpn_top, fpn_lateral, fpn_bottom, dim_top, dim_lateral
-):
+        model, fpn_top, fpn_lateral, fpn_bottom, dim_top, dim_lateral
+    ):
     """Add a top-down lateral module."""
     # Lateral 1x1 conv
     if cfg.FPN.USE_GN:
@@ -360,7 +360,7 @@ def add_fpn_rpn_outputs(model, blobs_in, dim_in, spatial_scales):
                 stride=1,
                 weight_init=gauss_fill(0.01),
                 bias_init=const_fill(0.0),
-                conv_algorithm = conv3x3_algorithm #conv3x3_algorithm[lvl-k_min]
+                conv_algorithm=conv3x3_algorithm #conv3x3_algorithm[lvl-k_min]
             )
             model.Relu(conv_rpn_fpn, conv_rpn_fpn)
             # Proposal classification scores
@@ -401,7 +401,7 @@ def add_fpn_rpn_outputs(model, blobs_in, dim_in, spatial_scales):
                 stride=1,
                 weight='conv_rpn_fpn' + sk_min + '_w',
                 bias='conv_rpn_fpn' + sk_min + '_b',
-                conv_algorithm = conv3x3_algorithm
+                conv_algorithm=conv3x3_algorithm
             )
             model.Relu(conv_rpn_fpn, conv_rpn_fpn)
             # Proposal classification scores
@@ -520,8 +520,8 @@ def map_rois_to_fpn_levels(rois, k_min, k_max):
 
 
 def add_multilevel_roi_blobs(
-    blobs, blob_prefix, rois, target_lvls, lvl_min, lvl_max
-):
+        blobs, blob_prefix, rois, target_lvls, lvl_min, lvl_max
+    ):
     """Add RoI blobs for multiple FPN levels to the blobs dict.
 
     blobs: a dict mapping from blob name to numpy ndarray

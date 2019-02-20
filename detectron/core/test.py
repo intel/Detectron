@@ -29,11 +29,10 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from collections import defaultdict
-import cv2
 import os
 import logging
 import numpy as np
-import six
+import cv2
 from caffe2.python import core
 from caffe2.python import workspace
 from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
@@ -53,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 def im_detect_all(model, im, box_proposals, timers=None, model1=None):
+    """the main function to run Net"""
     if timers is None:
         timers = defaultdict(Timer)
 
@@ -81,9 +81,10 @@ def im_detect_all(model, im, box_proposals, timers=None, model1=None):
     batch_size = int(max(batch_indices)+1)
     for i in range(batch_size):
         idx = (batch_indices == i)
-        per_image_scores = scores[idx,:]
-        per_image_boxes = boxes[idx,:]
-        per_image_scores, per_image_boxes, per_image_cls_boxes = box_results_with_nms_and_limit(per_image_scores, per_image_boxes)
+        per_image_scores = scores[idx, :]
+        per_image_boxes = boxes[idx, :]
+        per_image_scores, per_image_boxes, per_image_cls_boxes = \
+            box_results_with_nms_and_limit(per_image_scores, per_image_boxes)
         cls_boxes_list.append(per_image_cls_boxes)
         if i == 0:
             batch_scores = per_image_scores
@@ -133,11 +134,11 @@ def im_detect_all(model, im, box_proposals, timers=None, model1=None):
 
 def im_conv_body_only(model, im, target_scale, target_max_size):
     """Runs `model.conv_body_net` on the given image `im`."""
-    im_blob, im_scale, _im_info = blob_utils.get_image_blob(
+    im_blob, im_scale, _ = blob_utils.get_image_blob(
         im, target_scale, target_max_size
     )
     workspace.FeedBlob(core.ScopedName('data'), im_blob)
-    if os.environ.get('INT8INFO')=="1":
+    if os.environ.get('INT8INFO') == "1":
         algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
         if kind == "moving_average":
@@ -155,7 +156,7 @@ def im_conv_body_only(model, im, target_scale, target_max_size):
     return im_scale
 
 
-def im_detect_bbox(model, im, target_scale, target_max_size, size_fix, timers=None, model1=None, boxes=None):
+def im_detect_bbox(model, im, target_scale, target_max_size, size_fix=None, timers=None, model1=None, boxes=None):
     """Bounding box object detection for an image with given box proposals.
 
     Arguments:
@@ -208,10 +209,10 @@ def im_detect_bbox(model, im, target_scale, target_max_size, size_fix, timers=No
             workspace.FeedBlob(core.ScopedName(k), v)
     timers['data1'].toc()
     # run first time to warm up
-    if os.environ.get('EPOCH2OLD')=="1":
+    if os.environ.get('EPOCH2OLD') == "1":
         workspace.RunNet(model.net.Proto().name)
     timers['run'].tic()
-    if os.environ.get('INT8INFO')=="1":
+    if os.environ.get('INT8INFO') == "1":
         algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
         if kind == "moving_average":
@@ -237,7 +238,7 @@ def im_detect_bbox(model, im, target_scale, target_max_size, size_fix, timers=No
                 int8_inputs = []
                 for inp in model.net.Proto().op[i].input:
                     int8_inputs.append(workspace.FetchBlob(str(inp)))
-                logging.warning(" opint8[{0}] is  {1}".format(i,model.net.Proto().op[i]))
+                logging.warning(" opint8[{0}] is  {1}".format(i, model.net.Proto().op[i]))
                 workspace.RunOperatorOnce(model.net.Proto().op[i])
                 int8_results = []
                 for res in model.net.Proto().op[i].output:
@@ -246,7 +247,7 @@ def im_detect_bbox(model, im, target_scale, target_max_size, size_fix, timers=No
                 fp32_inputs = []
                 for inp1 in model1.net.Proto().op[i].input:
                     fp32_inputs.append(workspace.FetchBlob(str(inp1)))
-                logging.warning(" opfp32[{0}] is  {1}".format(i,model1.net.Proto().op[i]))
+                logging.warning(" opfp32[{0}] is  {1}".format(i, model1.net.Proto().op[i]))
                 workspace.RunOperatorOnce(model1.net.Proto().op[i])
                 fp32_results = []
                 for res1 in model1.net.Proto().op[i].output:
@@ -257,22 +258,21 @@ def im_detect_bbox(model, im, target_scale, target_max_size, size_fix, timers=No
                 if len(int8_results) != len(fp32_results):
                     logging.error("Wrong number of outputs")
                     return
-                tol = {'atol': 5e-01, 'rtol': 5e-01}
-                logging.warning("begin to check op[{}] {} input".format(i,model.net.Proto().op[i].type))
+                logging.warning("begin to check op[{}] {} input".format(i, model.net.Proto().op[i].type))
                 for k in range(len(int8_inputs)):
                     if model.net.Proto().op[i].input[k][0] == '_':
                         continue
                     #assert_allclose(int8_inputs[k], fp32_inputs[k], **tol)
-                logging.warning("pass checking op[{0}] {1} input".format(i,model.net.Proto().op[i].type))
-                logging.warning("begin to check op[{0}] {1} output".format(i,model.net.Proto().op[i].type))
-                for j in range(len(int8_results)):
+                logging.warning("pass checking op[{0}] {1} input".format(i, model.net.Proto().op[i].type))
+                logging.warning("begin to check op[{0}] {1} output".format(i, model.net.Proto().op[i].type))
+                for j, int8_result in enumerate(int8_results):
                     if model.net.Proto().op[i].output[j][0] == '_':
                         continue
                     #logging.warning("int8_outputis {} and fp32 output is {} ".format(int8_results[j], fp32_results[j]))
                     #if not compare_utils.assert_allclose(int8_results[j], fp32_results[j], **tol):
-                    if not compare_utils.assert_compare(int8_results[j], fp32_results[j], 1e-01, cosim_alg):
-                        for k in range(len(int8_inputs)):
-                            logging.warning("int8_input[{}] is {}".format(k, int8_inputs[k]))
+                    if not compare_utils.assert_compare(int8_result, fp32_results[j], 1e-01, cosim_alg):
+                        for k, int8_input in enumerate(int8_inputs):
+                            logging.warning("int8_input[{}] is {}".format(k, int8_input))
                             logging.warning("fp32_input[{}] is {}".format(k, fp32_inputs[k]))
                     #assert_allclose(int8_results[j], fp32_results[j], **tol)
                 logging.warning("pass checking op[{0}] {1} output".format(i, model.net.Proto().op[i].type))
@@ -285,7 +285,7 @@ def im_detect_bbox(model, im, target_scale, target_max_size, size_fix, timers=No
         rois = workspace.FetchBlob(core.ScopedName('rois'))
         # unscale back to raw image space
         boxes = rois[:, 1:5] / im_scale
-        batch_indices = rois[:,0]
+        batch_indices = rois[:, 0]
 
     # Softmax class probabilities
     scores = workspace.FetchBlob(core.ScopedName('cls_prob')).squeeze()
@@ -325,10 +325,10 @@ def im_detect_bbox_aug(model, im, box_proposals=None):
     """
     assert not cfg.TEST.BBOX_AUG.SCALE_SIZE_DEP, \
         'Size dependent scaling not implemented'
-    assert not cfg.TEST.BBOX_AUG.SCORE_HEUR == 'UNION' or \
+    assert cfg.TEST.BBOX_AUG.SCORE_HEUR != 'UNION' or \
         cfg.TEST.BBOX_AUG.COORD_HEUR == 'UNION', \
         'Coord heuristic must be union whenever score heuristic is union'
-    assert not cfg.TEST.BBOX_AUG.COORD_HEUR == 'UNION' or \
+    assert cfg.TEST.BBOX_AUG.COORD_HEUR != 'UNION' or \
         cfg.TEST.BBOX_AUG.SCORE_HEUR == 'UNION', \
         'Score heuristic must be union whenever coord heuristic is union'
     assert not cfg.MODEL.FASTER_RCNN or \
@@ -417,8 +417,8 @@ def im_detect_bbox_aug(model, im, box_proposals=None):
 
 
 def im_detect_bbox_hflip(
-    model, im, target_scale, target_max_size, box_proposals=None
-):
+        model, im, target_scale, target_max_size, box_proposals=None
+    ):
     """Performs bbox detection on the horizontally flipped image.
     Function signature is the same as for im_detect_bbox.
     """
@@ -442,8 +442,8 @@ def im_detect_bbox_hflip(
 
 
 def im_detect_bbox_scale(
-    model, im, target_scale, target_max_size, box_proposals=None, hflip=False
-):
+        model, im, target_scale, target_max_size, box_proposals=None, hflip=False
+    ):
     """Computes bbox detections at the given scale.
     Returns predictions in the original image space.
     """
@@ -459,8 +459,8 @@ def im_detect_bbox_scale(
 
 
 def im_detect_bbox_aspect_ratio(
-    model, im, aspect_ratio, box_proposals=None, hflip=False
-):
+        model, im, aspect_ratio, box_proposals=None, hflip=False
+    ):
     """Computes bbox detections at the given width-relative aspect ratio.
     Returns predictions in the original image space.
     """
@@ -528,10 +528,10 @@ def im_detect_mask(model, im_scale, boxes, timers=None):
         workspace.FeedBlob(core.ScopedName(k), v)
     timers['data_mask'].toc()
     #run first time to warm up
-    if os.environ.get('EPOCH2OLD')=="1":
+    if os.environ.get('EPOCH2OLD') == "1":
         workspace.RunNet(model.mask_net.Proto().name)
     timers['run_mask'].tic()
-    if os.environ.get('INT8INFO')=="1":
+    if os.environ.get('INT8INFO') == "1":
         algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
         if kind == "moving_average":
@@ -652,8 +652,8 @@ def im_detect_mask_hflip(model, im, target_scale, target_max_size, boxes):
 
 
 def im_detect_mask_scale(
-    model, im, target_scale, target_max_size, boxes, hflip=False
-):
+        model, im, target_scale, target_max_size, boxes, hflip=False
+    ):
     """Computes masks at the given scale."""
     if hflip:
         masks_scl = im_detect_mask_hflip(
@@ -715,7 +715,7 @@ def im_detect_keypoints(model, im_scale, boxes):
 
     for k, v in inputs.items():
         workspace.FeedBlob(core.ScopedName(k), v)
-    if os.environ.get('INT8INFO')=="1":
+    if os.environ.get('INT8INFO') == "1":
         algorithm = AbsmaxCalib()
         kind = os.environ.get('INT8CALIB')
         if kind == "moving_average":
@@ -845,8 +845,8 @@ def im_detect_keypoints_hflip(model, im, target_scale, target_max_size, boxes):
 
 
 def im_detect_keypoints_scale(
-    model, im, target_scale, target_max_size, boxes, hflip=False
-):
+        model, im, target_scale, target_max_size, boxes, hflip=False
+    ):
     """Computes keypoint predictions at the given scale."""
     if hflip:
         heatmaps_scl = im_detect_keypoints_hflip(
@@ -859,8 +859,8 @@ def im_detect_keypoints_scale(
 
 
 def im_detect_keypoints_aspect_ratio(
-    model, im, aspect_ratio, boxes, hflip=False
-):
+        model, im, aspect_ratio, boxes, hflip=False
+    ):
     """Detects keypoints at the given width-relative aspect ratio."""
 
     # Perform keypoint detectionon the transformed image
@@ -972,6 +972,7 @@ def box_results_with_nms_and_limit(scores, boxes):
 
 
 def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w, bs=1):
+    """calculate the segm results"""
     num_classes = cfg.MODEL.NUM_CLASSES
     cls_segms = [[] for _ in range(num_classes)]
     mask_ind = 0
@@ -1025,11 +1026,12 @@ def segm_results(cls_boxes, masks, ref_boxes, im_h, im_w, bs=1):
 
         cls_segms[j] = segms
 
-    assert (mask_ind * bs)  == masks.shape[0]
+    assert (mask_ind * bs) == masks.shape[0]
     return cls_segms
 
 
 def keypoint_results(cls_boxes, pred_heatmaps, ref_boxes):
+    """calculate the keypoint result"""
     num_classes = cfg.MODEL.NUM_CLASSES
     cls_keyps = [[] for _ in range(num_classes)]
     person_idx = keypoint_utils.get_person_class_index()

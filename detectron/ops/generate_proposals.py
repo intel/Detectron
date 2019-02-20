@@ -20,6 +20,7 @@
 # Licensed under The MIT License [see LICENSE for details]
 # Written by Ross Girshick and Sean Bell
 # --------------------------------------------------------
+"""op def of generate proposal"""
 
 import numpy as np
 
@@ -105,8 +106,9 @@ class GenerateProposalsOp(object):
             outputs[1].data[...] = roi_probs
 
     def proposals_for_one_image(
-        self, im_info, all_anchors, bbox_deltas, scores
-    ):
+            self, im_info, all_anchors, bbox_deltas, scores
+        ):
+        """propsals for one image"""
         # Get mode-dependent configuration
         cfg_key = 'TRAIN' if self._train else 'TEST'
         pre_nms_topN = cfg[cfg_key].RPN_PRE_NMS_TOP_N

@@ -14,15 +14,16 @@
 ##############################################################################
 
 """Detection output visualization module."""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import cv2
-import numpy as np
 import os
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
 
 import pycocotools.mask as mask_util
 
@@ -33,8 +34,6 @@ import detectron.utils.keypoints as keypoint_utils
 # Matplotlib requires certain adjustments in some environments
 # Must happen before importing matplotlib
 envu.set_up_matplotlib()
-import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
 
 plt.rcParams['pdf.fonttype'] = 42  # For editing in Adobe Illustrator
 
@@ -45,6 +44,7 @@ _WHITE = (255, 255, 255)
 
 
 def kp_connections(keypoints):
+    """def kp connections"""
     kp_lines = [
         [keypoints.index('left_eye'), keypoints.index('right_eye')],
         [keypoints.index('left_eye'), keypoints.index('nose')],
@@ -83,8 +83,8 @@ def convert_from_cls_format(cls_boxes, cls_segms, cls_keyps):
     else:
         keyps = None
     classes = []
-    for j in range(len(cls_boxes)):
-        classes += [ (j % 81) ] * len(cls_boxes[j])
+    for j, cls_box in enumerate(cls_boxes):
+        classes += [(j % 81)] * len(cls_box)
     return boxes, segms, keyps, classes
 
 
@@ -176,7 +176,7 @@ def vis_keypoints(img, kps, kp_thresh=2, alpha=0.7):
             color=colors[len(kp_lines) + 1], thickness=2, lineType=cv2.LINE_AA)
 
     # Draw the keypoints.
-    for l in range(len(kp_lines)):
+    for l, _ in enumerate(kp_lines):
         i1 = kp_lines[l][0]
         i2 = kp_lines[l][1]
         p1 = kps[0, i1], kps[1, i1]
@@ -341,7 +341,7 @@ def vis_one_image(
         if keypoints is not None and len(keypoints) > i:
             kps = keypoints[i]
             plt.autoscale(False)
-            for l in range(len(kp_lines)):
+            for l, _ in enumerate(kp_lines):
                 i1 = kp_lines[l][0]
                 i2 = kp_lines[l][1]
                 if kps[2, i1] > kp_thresh and kps[2, i2] > kp_thresh:

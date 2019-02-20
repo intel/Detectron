@@ -23,11 +23,11 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import argparse
-import cv2  # NOQA (Must import before importing caffe2 due to bug in cv2)
 import os
 import pprint
 import sys
 import time
+import cv2  # NOQA (Must import before importing caffe2 due to bug in cv2)
 
 from caffe2.python import workspace
 
@@ -47,6 +47,7 @@ cv2.ocl.setUseOpenCL(False)
 
 
 def parse_args():
+    """to parse the argument"""
     parser = argparse.ArgumentParser(description='Test a Fast R-CNN network')
     parser.add_argument(
         '--cfg',

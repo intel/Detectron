@@ -20,8 +20,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import numpy as np
 import logging
+import numpy as np
 
 from caffe2.python import cnn
 from caffe2.python import core
@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 class DetectionModelHelper(cnn.CNNModelHelper):
+    """class of detection model"""
     def __init__(self, **kwargs):
         # Handle args specific to the DetectionModelHelper, others pass through
         # to CNNModelHelper
@@ -237,15 +238,15 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         return blob_out
 
     def RoIFeatureTransform(
-        self,
-        blobs_in,
-        blob_out,
-        blob_rois='rois',
-        method='RoIPoolF',
-        resolution=7,
-        spatial_scale=1. / 16.,
-        sampling_ratio=0
-    ):
+            self,
+            blobs_in,
+            blob_out,
+            blob_rois='rois',
+            method='RoIPoolF',
+            resolution=7,
+            spatial_scale=1. / 16.,
+            sampling_ratio=0
+        ):
         """Add the specified RoI pooling method. The sampling_ratio argument
         is supported for some, but not all, RoI transform methods.
 
@@ -302,16 +303,16 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         return xform_out[0] if isinstance(xform_out, tuple) else xform_out
 
     def ConvShared(
-        self,
-        blob_in,
-        blob_out,
-        dim_in,
-        dim_out,
-        kernel,
-        weight=None,
-        bias=None,
-        **kwargs
-    ):
+            self,
+            blob_in,
+            blob_out,
+            dim_in,
+            dim_out,
+            kernel,
+            weight=None,
+            bias=None,
+            **kwargs
+        ):
         """Add conv op that shares weights and/or biases with another conv op.
         """
         use_bias = (
@@ -337,8 +338,8 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         )
 
     def BilinearInterpolation(
-        self, blob_in, blob_out, dim_in, dim_out, up_scale
-    ):
+            self, blob_in, blob_out, dim_in, dim_out, up_scale
+        ):
         """Bilinear interpolation in space of scale.
 
         Takes input of NxKxHxW and outputs NxKx(sH)x(sW), where s:= up_scale
@@ -382,14 +383,14 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         return blob
 
     def ConvAffine(  # args in the same order of Conv()
-        self, blob_in, prefix, dim_in, dim_out, kernel, stride, pad,
-        group=1, dilation=1,
-        weight_init=None,
-        bias_init=None,
-        suffix='_bn',
-        inplace=False,
-        conv_algorithm=0
-    ):
+            self, blob_in, prefix, dim_in, dim_out, kernel, stride, pad,
+            group=1, dilation=1,
+            weight_init=None,
+            bias_init=None,
+            suffix='_bn',
+            inplace=False,
+            conv_algorithm=0
+        ):
         """ConvAffine adds a Conv op followed by a AffineChannel op (which
         replaces BN during fine tuning).
         """
@@ -414,14 +415,14 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         return blob_out
 
     def ConvGN(  # args in the same order of Conv()
-        self, blob_in, prefix, dim_in, dim_out, kernel, stride, pad,
-        group_gn,  # num of groups in gn
-        group=1, dilation=1,
-        weight_init=None,
-        bias_init=None,
-        suffix='_gn',
-        no_conv_bias=1,
-    ):
+            self, blob_in, prefix, dim_in, dim_out, kernel, stride, pad,
+            group_gn,  # num of groups in gn
+            group=1, dilation=1,
+            weight_init=None,
+            bias_init=None,
+            suffix='_gn',
+            no_conv_bias=1,
+        ):
         """ConvGN adds a Conv op followed by a GroupNorm op,
         including learnable scale/bias (gamma/beta)
         """

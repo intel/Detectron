@@ -26,13 +26,12 @@ from __future__ import unicode_literals
 
 from collections import defaultdict
 import argparse
-import cv2  # NOQA (Must import before importing caffe2 due to bug in cv2)
 import glob
 import logging
 import os
 import sys
 import time
-
+import cv2  # NOQA (Must import before importing caffe2 due to bug in cv2)
 from caffe2.python import workspace
 from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 
@@ -55,6 +54,9 @@ cv2.ocl.setUseOpenCL(False)
 
 
 def parse_args():
+    """
+    to parse the argument
+    """
     parser = argparse.ArgumentParser(description='End-to-end inference')
     parser.add_argument(
         '--cfg',
@@ -118,10 +120,13 @@ def parse_args():
     return parser.parse_args()
 
 def batch_image(im_list, batch_size):
+    """
+    to put the image into batches
+    """
     bs = batch_size
     fnames = []
     fname = []
-    for idx, im_name in enumerate(im_list):
+    for _, im_name in enumerate(im_list):
         bs -= 1
         fname.append(im_name)
         if bs == 0:
@@ -134,6 +139,9 @@ def batch_image(im_list, batch_size):
     return fnames
 
 def main(args):
+    """
+    main entry to run
+    """
     logger = logging.getLogger(__name__)
 
     merge_cfg_from_file(args.cfg)
@@ -147,13 +155,13 @@ def main(args):
         'Models that require precomputed proposals are not supported'
     fp32_ws_name = "__fp32_ws__"
     int8_ws_name = "__int8_ws__"
-    model1=None
+    model1 = None
     if os.environ.get('COSIM'):
         workspace.SwitchWorkspace(int8_ws_name, True)
-    model,_,_,_ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id = args.device_id)
+    model, _, _, _ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id=args.device_id)
     if os.environ.get('COSIM'):
         workspace.SwitchWorkspace(fp32_ws_name, True)
-        model1,_,_,_ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id = args.device_id, int8=False)
+        model1, _, _, _ = infer_engine.initialize_model_from_cfg(args.weights, gpu_id=args.device_id, int8=False)
 
     dummy_coco_dataset = dummy_datasets.get_coco_dataset()
 
@@ -166,17 +174,17 @@ def main(args):
     # for kl_divergence calibration, we use the first 100 images to get
     # the min and max values, and the remaing images are applied to compute the hist.
     # if the len(images) <= 100, we extend the images with themselves.
-    if os.environ.get('INT8INFO')=="1" and os.environ.get('INT8CALIB')=="kl_divergence":
+    if os.environ.get('INT8INFO') == "1" and os.environ.get('INT8CALIB') == "kl_divergence":
         kl_iter_num_for_range = os.environ.get('INT8KLNUM')
         if not kl_iter_num_for_range:
             kl_iter_num_for_range = 100
         kl_iter_num_for_range = int(kl_iter_num_for_range)
         while (len(fnames) < 2*kl_iter_num_for_range):
             fnames += fnames
-    if os.environ.get('EPOCH2')=="1":
+    if os.environ.get('EPOCH2') == "1":
         for i, im_name in enumerate(fnames):
             im = []
-            for j, name in enumerate(im_name):
+            for _, name in enumerate(im_name):
                 image = cv2.imread(name)
                 im.append(image)
 
@@ -189,7 +197,7 @@ def main(args):
     logger.warning("begin to run benchmark\n")
     for i, im_name in enumerate(fnames):
         im = []
-        for j, name in enumerate(im_name):
+        for _, name in enumerate(im_name):
             image = cv2.imread(name)
             im.append(image)
 
@@ -237,13 +245,13 @@ def main(args):
                 out_when_no_box=args.out_when_no_box
             )
 
-    if os.environ.get('INT8INFO')=="1":
+    if os.environ.get('INT8INFO') == "1":
         def save_net(net_def, init_def):
             if net_def is None or init_def is None:
                 return
             if net_def.name is None or init_def.name is None:
                 return
-            if os.environ.get('INT8PTXT')=="1":
+            if os.environ.get('INT8PTXT') == "1":
                 with open(net_def.name + '_predict_int8.ptxt', 'wb') as n:
                     n.write(str(net_def))
                 with open(net_def.name + '_init_int8.ptxt', 'wb') as n:

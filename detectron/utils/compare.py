@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ##############################################################################
-
+"""api to compare array"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -21,7 +21,6 @@ from __future__ import unicode_literals
 
 import logging
 import numpy as np
-import os
 import six
 
 
@@ -81,27 +80,27 @@ def assert_allclose(x, y, atol=1e-5, rtol=1e-4, verbose=True):
 
 def assert_compare(x, y, atol=1e-5, method='ALL'):
     """method can be MSE, MAE and RMSE"""
-    mae=0
-    mse=0
-    rmse=0
-    result=0
-    if method=='MAE':
+    mae = 0
+    mse = 0
+    rmse = 0
+    result = 0
+    if method == 'MAE':
         mae = np.abs(x-y).mean()
-        result=mae
-    elif method=='RMSE':
-        rmse=np.sqrt(np.square(x - y).mean())
-        result=rmse
+        result = mae
+    elif method == 'RMSE':
+        rmse = np.sqrt(np.square(x - y).mean())
+        result = rmse
         #result=np.sqrt(((x - y) ** 2).mean())
-    elif method=='MSE':
+    elif method == 'MSE':
         mse = np.square(x - y).mean()
-        result=mse
+        result = mse
         #result=((x - y) ** 2).mean()
     else:
         mae = np.abs(x-y).mean()
-        rmse=np.sqrt(np.square(x - y).mean())
+        rmse = np.sqrt(np.square(x - y).mean())
         mse = np.square(x - y).mean()
 
-    if result > atol or (method =='ALL' and (mae > atol or rmse > atol or mse > atol) ):
+    if result > atol or (method == 'ALL' and (mae > atol or rmse > atol or mse > atol)):
         f = six.StringIO()
         f.write(
             'assert_compare failed: \n' +
@@ -133,4 +132,3 @@ def assert_compare(x, y, atol=1e-5, method='ALL'):
             return False
     else:
         return True
-

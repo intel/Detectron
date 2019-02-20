@@ -43,13 +43,13 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from ast import literal_eval
-from future.utils import iteritems
-from past.builtins import basestring
 import copy
 import logging
-import numpy as np
 import os
 import os.path as osp
+import numpy as np
+from future.utils import iteritems
+from past.builtins import basestring
 import yaml
 
 from detectron.utils.collections import AttrDict
@@ -1115,6 +1115,7 @@ def get_output_dir(datasets, training=True):
 
 def load_cfg(cfg_to_load):
     """Wrapper around yaml.load used for maintaining backward compatibility"""
+    #pylint: disable=undefined-variable
     assert isinstance(cfg_to_load, (file, basestring)), \
         'Expected {} or {} got {}'.format(file, basestring, type(cfg_to_load))
     if isinstance(cfg_to_load, file):

@@ -59,16 +59,16 @@ def add_ResNet152_conv5_body(model):
 
 
 def add_stage(
-    model,
-    prefix,
-    blob_in,
-    n,
-    dim_in,
-    dim_out,
-    dim_inner,
-    dilation,
-    stride_init=2
-):
+        model,
+        prefix,
+        blob_in,
+        n,
+        dim_in,
+        dim_out,
+        dim_inner,
+        dilation,
+        stride_init=2
+    ):
     """Add a ResNet stage to the model by stacking n residual blocks."""
     # e.g., prefix = res2
     #algorithm = {
@@ -76,7 +76,7 @@ def add_stage(
     #        "res3" : [1, 1, 1, 1],
     #        "res4" : [1, 1, 1, 1, 1, 1],
     #        "res5" : [1, 1, 1]}
-    group=cfg.RESNETS.NUM_GROUPS
+    group = cfg.RESNETS.NUM_GROUPS
     if os.environ.get('CONV_ALGORITHM') is None or group > 1:
         algorithm = 0
     else:
@@ -94,7 +94,7 @@ def add_stage(
             # Not using inplace for the last block;
             # it may be fetched externally or used by FPN
             inplace_sum=i < n - 1,
-            conv3x3_algorithm = algorithm  #algorithm[prefix][i] 
+            conv3x3_algorithm=algorithm  #algorithm[prefix][i]
         )
         dim_in = dim_out
     return blob_in, dim_in
@@ -164,16 +164,16 @@ def add_ResNet_roi_conv5_head(model, blob_in, dim_in, spatial_scale):
 
 
 def add_residual_block(
-    model,
-    prefix,
-    blob_in,
-    dim_in,
-    dim_out,
-    dim_inner,
-    dilation,
-    stride_init=2,
-    inplace_sum=False,
-    conv3x3_algorithm = 0
+        model,
+        prefix,
+        blob_in,
+        dim_in,
+        dim_out,
+        dim_inner,
+        dilation,
+        stride_init=2,
+        inplace_sum=False,
+        conv3x3_algorithm=0
 ):
     """Add a residual block to the model."""
     # prefix = res<stage>_<sub_stage>, e.g., res2_3
@@ -195,7 +195,7 @@ def add_residual_block(
         dim_inner,
         group=cfg.RESNETS.NUM_GROUPS,
         dilation=dilation,
-        conv3x3_algorithm = conv3x3_algorithm 
+        conv3x3_algorithm=conv3x3_algorithm
     )
 
     # sum -> ReLU
@@ -289,17 +289,17 @@ def basic_gn_stem(model, data, **kwargs):
 
 
 def bottleneck_transformation(
-    model,
-    blob_in,
-    dim_in,
-    dim_out,
-    stride,
-    prefix,
-    dim_inner,
-    dilation=1,
-    group=1,
-    conv3x3_algorithm=0
-):
+        model,
+        blob_in,
+        dim_in,
+        dim_out,
+        stride,
+        prefix,
+        dim_inner,
+        dilation=1,
+        group=1,
+        conv3x3_algorithm=0
+    ):
     """Add a bottleneck transformation to the model."""
     # In original resnet, stride=2 is on 1x1.
     # In fb.torch resnet, stride=2 is on 3x3.
@@ -351,16 +351,16 @@ def bottleneck_transformation(
 
 
 def bottleneck_gn_transformation(
-    model,
-    blob_in,
-    dim_in,
-    dim_out,
-    stride,
-    prefix,
-    dim_inner,
-    dilation=1,
-    group=1
-):
+        model,
+        blob_in,
+        dim_in,
+        dim_out,
+        stride,
+        prefix,
+        dim_inner,
+        dilation=1,
+        group=1
+    ):
     """Add a bottleneck transformation with GroupNorm to the model."""
     # In original resnet, stride=2 is on 1x1.
     # In fb.torch resnet, stride=2 is on 3x3.

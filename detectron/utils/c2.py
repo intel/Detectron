@@ -20,8 +20,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from six import string_types
 import contextlib
+from six import string_types
 
 from caffe2.proto import caffe2_pb2
 from caffe2.python import core
@@ -81,6 +81,7 @@ def SuffixNet(name, net, prefix_len, outputs):
 
 def BlobReferenceList(blob_ref_or_list):
     """Ensure that the argument is returned as a list of BlobReferences."""
+    #pylint: disable=unidiomatic-typecheck
     if isinstance(blob_ref_or_list, core.BlobReference):
         return [blob_ref_or_list]
     elif type(blob_ref_or_list) in (list, tuple):
@@ -130,6 +131,7 @@ def GpuNameScope(gpu_id):
 
 @contextlib.contextmanager
 def CudaScope(gpu_id):
+    """cuda scope"""
     if gpu_id == DEVICE_ID_CPU:
         with CpuScope():
             yield
