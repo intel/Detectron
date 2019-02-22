@@ -26,8 +26,8 @@ from collections import defaultdict
 import numpy as np
 
 from caffe2.python import core, workspace
-from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 
+from detectron.core.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 from detectron.core.config import cfg
 from detectron.modeling.generate_anchors import generate_anchors
 from detectron.utils.timer import Timer

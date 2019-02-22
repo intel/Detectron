@@ -35,9 +35,9 @@ import numpy as np
 import cv2
 from caffe2.python import core
 from caffe2.python import workspace
-from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 import pycocotools.mask as mask_util
 
+from detectron.core.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 from detectron.core.config import cfg
 from detectron.utils.timer import Timer
 import detectron.core.test_retinanet as test_retinanet

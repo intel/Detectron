@@ -33,8 +33,8 @@ import sys
 import time
 import cv2  # NOQA (Must import before importing caffe2 due to bug in cv2)
 from caffe2.python import workspace
-from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 
+from detectron.core.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 from detectron.core.config import assert_and_infer_cfg
 from detectron.core.config import cfg
 from detectron.core.config import merge_cfg_from_file

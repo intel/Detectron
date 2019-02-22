@@ -30,8 +30,8 @@ import cv2
 
 from caffe2.python import workspace
 from caffe2.python import transformations as tf
-from caffe2.python.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 
+from detectron.core.calibrator import Calibrator, KLCalib, AbsmaxCalib, EMACalib
 from detectron.core.config import cfg
 from detectron.core.config import get_output_dir
 from detectron.core.rpn_generator import generate_rpn_on_dataset
