@@ -252,9 +252,9 @@ def main(args):
             if net_def.name is None or init_def.name is None:
                 return
             if os.environ.get('INT8PTXT') == "1":
-                with open(net_def.name + '_predict_int8.ptxt', 'wb') as n:
+                with open(net_def.name + '_predict_int8.pbtxt', 'wb') as n:
                     n.write(str(net_def))
-                with open(net_def.name + '_init_int8.ptxt', 'wb') as n:
+                with open(net_def.name + '_init_int8.pbtxt', 'wb') as n:
                     n.write(str(init_def))
             else:
                 with open(net_def.name + '_predict_int8.pb', 'wb') as n:

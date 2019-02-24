@@ -383,9 +383,9 @@ def test_net(
             if net_def.name is None or init_def.name is None:
                 return
             if os.environ.get('INT8PTXT') == "1":
-                with open(net_def.name + '_predict_int8.ptxt', 'wb') as n:
+                with open(net_def.name + '_predict_int8.pbtxt', 'wb') as n:
                     n.write(str(net_def))
-                with open(net_def.name + '_init_int8.ptxt', 'wb') as n:
+                with open(net_def.name + '_init_int8.pbtxt', 'wb') as n:
                     n.write(str(init_def))
             else:
                 with open(net_def.name + '_predict_int8.pb', 'wb') as n:
@@ -459,21 +459,23 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
     def CreateNet(net):
         int8_file_path = int8_path if int8_path else ''
         if os.environ.get('INT8PTXT') == "1":
-            int8_predict_file = int8_file_path + '/' + net.Proto().name + '_predict_int8.ptxt'
-            int8_init_file = int8_file_path + '/' + net.Proto().name + '_init_int8.ptxt'
+            int8_predict_file = int8_file_path + '/' + net.Proto().name + '_predict_int8.pbtxt'
+            int8_init_file = int8_file_path + '/' + net.Proto().name + '_init_int8.pbtxt'
         else:
             int8_predict_file = int8_file_path + '/' + net.Proto().name + '_predict_int8.pb'
             int8_init_file = int8_file_path + '/' + net.Proto().name + '_init_int8.pb'
         if os.path.isfile(int8_init_file):
+            logging.warning('Loading Int8 init file for module {}'.format(net.Proto().name))
             workspace.RunNetOnce(LoadModuleFile(int8_init_file))
         if os.path.isfile(int8_predict_file):
+            logging.warning('Loading Int8 predict file for module {}'.format(net.Proto().name))
             net.Proto().CopyFrom(LoadModuleFile(int8_predict_file))
         if os.environ.get('DEBUGMODE') == "1":
             for i, op in enumerate(net.Proto().op):
                 if len(op.name) == 0:
                     op.name = op.type.lower() + str(i)
         if gpu_id == -2 and os.environ.get('DNOOPT') != "1":
-            logging.warning('optimize....................')
+            logging.warning('Optimize module {}....................'.format(net.Proto().name))
             tf.optimizeForMKLDNN(net)
         if os.environ.get('DEBUGMODE') == "1":
             with open("{}_opt_predict_net.pb".format(net.Proto().name), "w") as fid:
