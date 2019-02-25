@@ -4,6 +4,7 @@ This document provides brief tutorials covering Detectron for inference and trai
 
 - For general information about Detectron, please see [`README.md`](README.md).
 - For installation instructions, please see [`INSTALL.md`](INSTALL.md).
+- For quantization instructions, please see [`QUANTIZATION.md`](QUANTIZATION.md).
 
 ## Inference with Pretrained Models
 
@@ -29,7 +30,7 @@ Detectron should automatically download the model from the URL specified by the 
 **Notes:**
 
 - When running inference on your own high-resolution images, Mask R-CNN may be slow simply because substantial time is spent upsampling the predicted masks to the original image resolution (this has not been optimized). You can diagnose this issue if the `misc_mask` time reported by `tools/infer_simple.py` is high (e.g., much more than 20-90ms). The solution is to first resize your images such that the short side is around 600-800px (the exact choice does not matter) and then run inference on the resized image.
-
+- add '--device_id [int]' to specify the (0)GPU, (-1)Native CPU or (-2)CPU with Intel Engine. for example, run with CPU with Intel Engine, add '--device_id -2'
 
 #### 2. COCO Dataset
 This example shows how to run an end-to-end trained Mask R-CNN model from the model zoo using a single GPU for inference. As configured, this will run inference on all images in `coco_2014_minival` (which must be properly installed).
@@ -50,6 +51,10 @@ python2 tools/test_net.py \
     TEST.WEIGHTS https://s3-us-west-2.amazonaws.com/detectron/35861858/12_2017_baselines/e2e_mask_rcnn_R-101-FPN_2x.yaml.02_32_51.SgT4y1cO/output/train/coco_2014_train:coco_2014_valminusminival/generalized_rcnn/model_final.pkl \
     NUM_GPUS $N
 ```
+
+**Note**
+
+- add '--device_id [int]' to specify the (0)GPU, (-1)Native CPU or (-2)CPU with Intel Engine. for example, run with CPU with Intel Engine, add '--device_id -2'
 
 On an NVIDIA Tesla P100 GPU, inference should take about 130-140 ms per image for this example.
 
