@@ -6,6 +6,24 @@ This document provides brief tutorials covering Detectron for inference and trai
 - For installation instructions, please see [`INSTALL.md`](INSTALL.md).
 - For quantization instructions, please see [`QUANTIZATION.md`](QUANTIZATION.md).
 
+## Build pytorch from the src 
+
+```
+git clone https://github.com/pytorch/pytorch.git
+git checkout 4ac91b2d64eeea5ca21083831db5950dc08441d6
+git submodule update --init --recursive
+wget https://patch-diff.githubusercontent.com/raw/pytorch/pytorch/pull/17464.diff
+git apply 17464.diff
+git submodule update --init --recursive
+
+make sure the third_party/ideep
+
+cd third_party/ideep
+git log
+git reset --hard 311346653b0daed97f9e9adf241e02cffa38e4c0
+```
+
+
 ## Inference with Pretrained Models
 
 #### 1. Directory of Image Files
@@ -15,6 +33,7 @@ To run inference on a directory of image files (`demo/*.jpg` in this example), y
 python2 tools/infer_simple.py \
     --cfg configs/12_2017_baselines/e2e_mask_rcnn_R-101-FPN_2x.yaml \
     --output-dir /tmp/detectron-visualizations \
+    --device_id -2 \
     --image-ext jpg \
     --wts https://s3-us-west-2.amazonaws.com/detectron/35861858/12_2017_baselines/e2e_mask_rcnn_R-101-FPN_2x.yaml.02_32_51.SgT4y1cO/output/train/coco_2014_train:coco_2014_valminusminival/generalized_rcnn/model_final.pkl \
     demo
@@ -38,26 +57,13 @@ This example shows how to run an end-to-end trained Mask R-CNN model from the mo
 ```
 python2 tools/test_net.py \
     --cfg configs/12_2017_baselines/e2e_mask_rcnn_R-101-FPN_2x.yaml \
+    --device_id -2 \
     TEST.WEIGHTS https://s3-us-west-2.amazonaws.com/detectron/35861858/12_2017_baselines/e2e_mask_rcnn_R-101-FPN_2x.yaml.02_32_51.SgT4y1cO/output/train/coco_2014_train:coco_2014_valminusminival/generalized_rcnn/model_final.pkl \
-    NUM_GPUS 1
-```
-
-Running inference with the same model using `$N` GPUs (e.g., `N=8`).
-
-```
-python2 tools/test_net.py \
-    --cfg configs/12_2017_baselines/e2e_mask_rcnn_R-101-FPN_2x.yaml \
-    --multi-gpu-testing \
-    TEST.WEIGHTS https://s3-us-west-2.amazonaws.com/detectron/35861858/12_2017_baselines/e2e_mask_rcnn_R-101-FPN_2x.yaml.02_32_51.SgT4y1cO/output/train/coco_2014_train:coco_2014_valminusminival/generalized_rcnn/model_final.pkl \
-    NUM_GPUS $N
 ```
 
 **Note**
 
 - add '--device_id [int]' to specify the (0)GPU, (-1)Native CPU or (-2)CPU with Intel Engine. for example, run with CPU with Intel Engine, add '--device_id -2'
-
-On an NVIDIA Tesla P100 GPU, inference should take about 130-140 ms per image for this example.
-
 
 ## Training a Model with Detectron
 
