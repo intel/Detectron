@@ -210,12 +210,14 @@ class KLCalib(algorithm):
         assert len(reference_distr_P) == len(candidate_distr_Q)
         tmp_sum1 = 0
         tmp_sum2 = 0
+        tmp_sum3 = 0
         for idx, _ in enumerate(reference_distr_P):
             p_idx = reference_distr_P[idx]
             q_idx = candidate_distr_Q[idx]
             if p_idx == 0:
                 tmp_sum1 += 0
                 tmp_sum2 += 0
+                tmp_sum3 += 0
             else:
                 if q_idx == 0:
                     print("Fatal error!, idx = " + str(idx) +
