@@ -312,14 +312,14 @@ def test_net(
             cls_boxes_i, cls_segms_i, cls_keyps_i = im_detect_all(
                 model, im, box_proposals, timers, model1
             )
-        if os.environ.get('DPROFILE') == "1" and ob != None:
+        if os.environ.get('DPROFILE') == "1" and ob is not None:
             logging.warning("enter profile log")
             logging.warning("net observer time = {}".format(ob.average_time()))
             logging.warning("net observer time = {}".format(ob.average_time_children()))
-        if os.environ.get('DPROFILE') == "1" and ob_mask != None:
+        if os.environ.get('DPROFILE') == "1" and ob_mask is not None:
             logging.warning("mask net observer time = {}".format(ob_mask.average_time()))
             logging.warning("mask net observer time = {}".format(ob_mask.average_time_children()))
-        if os.environ.get('DPROFILE') == "1" and ob_mask != None:
+        if os.environ.get('DPROFILE') == "1" and ob_mask is not None:
             logging.warning("keypoint net observer time = {}".format(ob_keypoint.average_time()))
             logging.warning("keypoint net observer time = {}".format(ob_keypoint.average_time_children()))
         extend_results(i, all_boxes, cls_boxes_i[0])
@@ -370,11 +370,11 @@ def test_net(
 
 
     #remove observer
-    if ob != None:
+    if ob is not None:
         model.net.RemoveObserver(ob)
-    if ob_mask != None:
+    if ob_mask is not None:
         model.mask_net.RemoveObserver(ob_mask)
-    if ob_keypoint != None:
+    if ob_keypoint is not None:
         model.keypoint_net.RemoveObserver(ob_keypoint)
     if os.environ.get('INT8INFO') == "1":
         def save_net(net_def, init_def):
@@ -483,7 +483,7 @@ def initialize_model_from_cfg(weights_file, gpu_id=0, int8=True):
             with open("{}_opt_predict_net.pbtxt".format(net.Proto().name), "w") as fid:
                 fid.write(str(net.Proto()))
         workspace.CreateNet(net)
-    if os.environ.get('COSIM') and int8 == False:
+   if os.environ.get('COSIM') and int8 is False:
         int8_path = None
     CreateNet(model.net)
     if os.environ.get('DPROFILE') == "1":
